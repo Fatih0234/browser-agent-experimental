@@ -27,7 +27,7 @@ export function NavSidebar() {
 
   if (!currentOrg) return null;
 
-  const basePath = `/dashboard/${currentOrg.slug}`;
+  const basePath = `/${currentOrg.slug}`;
 
   const navItems: NavItem[] = [
     {

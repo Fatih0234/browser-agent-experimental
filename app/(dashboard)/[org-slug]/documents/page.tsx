@@ -263,7 +263,7 @@ export default function DocumentsPage() {
                     </TableCell>
                     <TableCell>
                       <Link
-                        href={`/dashboard/${currentOrg.slug}/documents/${doc.id}`}
+                        href={`/${currentOrg.slug}/documents/${doc.id}`}
                         className="text-blue-600 hover:underline"
                       >
                         v{doc.latest_version?.version_number || 1}

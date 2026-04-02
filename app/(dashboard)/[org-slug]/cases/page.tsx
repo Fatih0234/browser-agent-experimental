@@ -236,7 +236,7 @@ export default function CasesPage() {
                   <TableRow key={c.id}>
                     <TableCell>
                       <Link
-                        href={`/dashboard/${currentOrg.slug}/cases/${c.id}`}
+                        href={`/${currentOrg.slug}/cases/${c.id}`}
                         className="font-medium hover:underline"
                       >
                         {c.title}

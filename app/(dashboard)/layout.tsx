@@ -20,7 +20,7 @@ export default async function DashboardLayout({
   }
 
   if (!user) {
-    redirect("/auth/sign-in");
+    redirect("/sign-in");
   }
 
   return (
@@ -34,7 +34,7 @@ export default async function DashboardLayout({
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-slate-600">{user.email}</span>
-              <form action="/auth/sign-out" method="post">
+              <form action="/sign-out" method="post">
                 <button
                   type="submit"
                   className="text-sm text-red-600 hover:text-red-800"

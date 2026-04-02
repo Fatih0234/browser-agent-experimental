@@ -12,7 +12,7 @@ export default function SelectOrgPage() {
 
   useEffect(() => {
     if (!isLoading && currentOrg) {
-      router.push(`/dashboard/${currentOrg.slug}`);
+      router.push(`/${currentOrg.slug}`);
     }
   }, [currentOrg, isLoading, router]);
 

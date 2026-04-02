@@ -8,5 +8,5 @@ export async function POST() {
   } catch {
     // Supabase not configured, just redirect
   }
-  redirect("/auth/sign-in");
+  redirect("/sign-in");
 }
