@@ -1,0 +1,678 @@
+{
+  "benchmark_version": "1.0.0",
+  "benchmark_name": "Portal Gym V1",
+  "description": "Browser agent capability assessment for multi-tenant SaaS application",
+  "base_url": "http://localhost:3001",
+  "credentials": {
+    "email": "test123@gmail.com",
+    "password": "testpassword123",
+    "org_slug": "demo-org"
+  },
+  "test_fixtures": {
+    "pdf": "/tmp/portal-gym-fixtures/test-document.pdf",
+    "csv": "/tmp/portal-gym-fixtures/test-data.csv",
+    "txt": "/tmp/portal-gym-fixtures/test-notes.txt"
+  },
+  "tasks": [
+    {
+      "id": "task-001",
+      "name": "Sign In and Reach Dashboard",
+      "category": "authentication",
+      "critical": true,
+      "description": "Authenticate with test credentials and verify dashboard access",
+      "steps": [
+        {
+          "order": 1,
+          "action": "navigate",
+          "target": "/sign-in",
+          "expected_state": "Sign-in page loaded"
+        },
+        {
+          "order": 2,
+          "action": "fill",
+          "target": "input[type='email']",
+          "value": "test123@gmail.com",
+          "expected_state": "Email field populated"
+        },
+        {
+          "order": 3,
+          "action": "fill",
+          "target": "input[type='password']",
+          "value": "testpassword123",
+          "expected_state": "Password field populated"
+        },
+        {
+          "order": 4,
+          "action": "click",
+          "target": "button[type='submit']",
+          "expected_state": "Form submitted"
+        },
+        {
+          "order": 5,
+          "action": "wait_for_navigation",
+          "expected_url": "/demo-org|/dashboard",
+          "timeout_ms": 5000
+        },
+        {
+          "order": 6,
+          "action": "verify",
+          "assertions": [
+            "User email visible in header",
+            "Navigation sidebar present",
+            "Org switcher shows 'Demo Organization'"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Navigation to dashboard succeeds",
+        "User email displayed",
+        "Navigation sidebar visible"
+      ],
+      "scoring": {
+        "time_weight": 1.0,
+        "retry_penalty": 0.1,
+        "max_retries": 3
+      }
+    },
+    {
+      "id": "task-002",
+      "name": "Navigate to Cases",
+      "category": "navigation",
+      "critical": false,
+      "depends_on": ["task-001"],
+      "description": "Access the case management page via sidebar navigation",
+      "steps": [
+        {
+          "order": 1,
+          "action": "click",
+          "target": "nav a:has-text('Cases')",
+          "expected_state": "Cases link clicked"
+        },
+        {
+          "order": 2,
+          "action": "wait_for_navigation",
+          "expected_url": "/demo-org/cases",
+          "timeout_ms": 3000
+        },
+        {
+          "order": 3,
+          "action": "verify",
+          "assertions": [
+            "Page heading shows 'Cases'",
+            "New Case button visible",
+            "Table or empty state present"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "URL is /demo-org/cases",
+        "Cases heading visible",
+        "New Case button accessible"
+      ],
+      "scoring": {
+        "time_weight": 0.5,
+        "retry_penalty": 0.1,
+        "max_retries": 2
+      }
+    },
+    {
+      "id": "task-003",
+      "name": "Create Case",
+      "category": "form_handling",
+      "critical": true,
+      "depends_on": ["task-002"],
+      "description": "Create a new case with title and description",
+      "steps": [
+        {
+          "order": 1,
+          "action": "click",
+          "target": "button:has-text('New Case')",
+          "expected_state": "Create dialog opens"
+        },
+        {
+          "order": 2,
+          "action": "fill",
+          "target": "input[name='title']",
+          "value": "Benchmark Test Case",
+          "expected_state": "Title populated"
+        },
+        {
+          "order": 3,
+          "action": "fill",
+          "target": "textarea[name='description']",
+          "value": "Created during benchmark run",
+          "expected_state": "Description populated"
+        },
+        {
+          "order": 4,
+          "action": "click",
+          "target": "button:has-text('Create Case')",
+          "expected_state": "Form submitted"
+        },
+        {
+          "order": 5,
+          "action": "wait",
+          "duration_ms": 2000
+        },
+        {
+          "order": 6,
+          "action": "capture",
+          "variable": "created_case_id",
+          "selector": "table tbody tr:first-child td:first-child"
+        },
+        {
+          "order": 7,
+          "action": "verify",
+          "assertions": [
+            "Dialog closed",
+            "Case appears in list",
+            "Title 'Benchmark Test Case' visible"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Dialog closes successfully",
+        "Case appears in table",
+        "No console errors"
+      ],
+      "scoring": {
+        "time_weight": 1.0,
+        "retry_penalty": 0.1,
+        "max_retries": 3
+      },
+      "state_capture": ["created_case_id"]
+    },
+    {
+      "id": "task-004",
+      "name": "Re-open Created Case After Refresh",
+      "category": "persistence",
+      "critical": false,
+      "depends_on": ["task-003"],
+      "description": "Verify case persists and can be reopened after page refresh",
+      "steps": [
+        {
+          "order": 1,
+          "action": "reload",
+          "ignore_cache": true,
+          "expected_state": "Page reloads"
+        },
+        {
+          "order": 2,
+          "action": "wait",
+          "duration_ms": 2000
+        },
+        {
+          "order": 3,
+          "action": "verify",
+          "assertions": [
+            "Created case still in list",
+            "URL remains /demo-org/cases"
+          ]
+        },
+        {
+          "order": 4,
+          "action": "click",
+          "target": "text='Benchmark Test Case'",
+          "expected_state": "Navigates to detail"
+        },
+        {
+          "order": 5,
+          "action": "wait_for_navigation",
+          "expected_url_pattern": "/demo-org/cases/.*",
+          "timeout_ms": 3000
+        },
+        {
+          "order": 6,
+          "action": "verify",
+          "assertions": [
+            "Case detail page loads",
+            "Title matches 'Benchmark Test Case'",
+            "Back to Cases link visible"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Case persists after refresh",
+        "Detail page loads correctly",
+        "Data matches original entry"
+      ],
+      "scoring": {
+        "time_weight": 0.8,
+        "retry_penalty": 0.1,
+        "max_retries": 2
+      }
+    },
+    {
+      "id": "task-005",
+      "name": "Upload PDF",
+      "category": "file_upload",
+      "critical": true,
+      "depends_on": ["task-001"],
+      "description": "Upload a PDF document via file picker",
+      "tooling": "playwright_only",
+      "steps": [
+        {
+          "order": 1,
+          "action": "navigate",
+          "target": "/demo-org/documents",
+          "expected_state": "Documents page loaded"
+        },
+        {
+          "order": 2,
+          "action": "click",
+          "target": "button:has-text('Upload Document')",
+          "expected_state": "Upload dialog opens"
+        },
+        {
+          "order": 3,
+          "action": "upload_file",
+          "target": "input[type='file']",
+          "file_path": "/tmp/portal-gym-fixtures/test-document.pdf",
+          "expected_state": "File selected"
+        },
+        {
+          "order": 4,
+          "action": "fill",
+          "target": "textarea#description",
+          "value": "PDF upload test",
+          "expected_state": "Description populated"
+        },
+        {
+          "order": 5,
+          "action": "click",
+          "target": "button[type='submit']:has-text('Upload')",
+          "expected_state": "Upload initiated"
+        },
+        {
+          "order": 6,
+          "action": "wait",
+          "duration_ms": 3000
+        },
+        {
+          "order": 7,
+          "action": "verify",
+          "assertions": [
+            "Dialog closed",
+            "test-document.pdf in list",
+            "Upload success toast visible"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Upload succeeds (HTTP 200)",
+        "Document appears in list",
+        "File name visible"
+      ],
+      "scoring": {
+        "time_weight": 1.5,
+        "retry_penalty": 0.1,
+        "max_retries": 3
+      }
+    },
+    {
+      "id": "task-006",
+      "name": "Upload CSV",
+      "category": "file_upload",
+      "critical": false,
+      "depends_on": ["task-001"],
+      "description": "Upload a CSV document via file picker",
+      "tooling": "playwright_only",
+      "steps": [
+        {
+          "order": 1,
+          "action": "navigate",
+          "target": "/demo-org/documents",
+          "expected_state": "Documents page loaded"
+        },
+        {
+          "order": 2,
+          "action": "click",
+          "target": "button:has-text('Upload Document')",
+          "expected_state": "Upload dialog opens"
+        },
+        {
+          "order": 3,
+          "action": "upload_file",
+          "target": "input[type='file']",
+          "file_path": "/tmp/portal-gym-fixtures/test-data.csv",
+          "expected_state": "File selected"
+        },
+        {
+          "order": 4,
+          "action": "fill",
+          "target": "textarea#description",
+          "value": "CSV upload test",
+          "expected_state": "Description populated"
+        },
+        {
+          "order": 5,
+          "action": "click",
+          "target": "button[type='submit']:has-text('Upload')",
+          "expected_state": "Upload initiated"
+        },
+        {
+          "order": 6,
+          "action": "wait",
+          "duration_ms": 3000
+        },
+        {
+          "order": 7,
+          "action": "verify",
+          "assertions": [
+            "Dialog closed",
+            "test-data.csv in list"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Upload succeeds",
+        "Document appears in list",
+        "File name visible"
+      ],
+      "scoring": {
+        "time_weight": 1.5,
+        "retry_penalty": 0.1,
+        "max_retries": 3
+      }
+    },
+    {
+      "id": "task-007",
+      "name": "Find Matching Audit Log Entry",
+      "category": "data_verification",
+      "critical": false,
+      "depends_on": ["task-003"],
+      "description": "Navigate to audit log and verify case creation was logged",
+      "steps": [
+        {
+          "order": 1,
+          "action": "navigate",
+          "target": "/demo-org/audit-log",
+          "expected_state": "Audit log page loaded"
+        },
+        {
+          "order": 2,
+          "action": "verify",
+          "assertions": [
+            "Page heading shows 'Audit Log'",
+            "Table with entries visible"
+          ]
+        },
+        {
+          "order": 3,
+          "action": "find_element",
+          "selector": "text='Created Case'",
+          "expected_state": "Case creation entry found"
+        },
+        {
+          "order": 4,
+          "action": "verify",
+          "assertions": [
+            "Action column shows 'Created Case'",
+            "Timestamp is recent",
+            "User attribution correct"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Audit log page loads",
+        "Created Case entry visible",
+        "Data attribution correct"
+      ],
+      "scoring": {
+        "time_weight": 0.8,
+        "retry_penalty": 0.1,
+        "max_retries": 2
+      }
+    },
+    {
+      "id": "task-008",
+      "name": "Seed Scenario",
+      "category": "admin",
+      "critical": true,
+      "depends_on": ["task-001"],
+      "description": "Use admin seed to create sample data",
+      "steps": [
+        {
+          "order": 1,
+          "action": "navigate",
+          "target": "/demo-org/admin/seed",
+          "expected_state": "Scenario management page loaded"
+        },
+        {
+          "order": 2,
+          "action": "verify",
+          "assertions": [
+            "Page heading shows 'Scenario Management'",
+            "Seed Data button visible"
+          ]
+        },
+        {
+          "order": 3,
+          "action": "click",
+          "target": "button:has-text('Seed Data')",
+          "expected_state": "AlertDialog opens"
+        },
+        {
+          "order": 4,
+          "action": "verify",
+          "assertions": [
+            "Dialog title shows 'Seed Scenario Data?'",
+            "Continue button visible"
+          ]
+        },
+        {
+          "order": 5,
+          "action": "click",
+          "target": "button:has-text('Continue')",
+          "expected_state": "Seeding initiated"
+        },
+        {
+          "order": 6,
+          "action": "wait",
+          "duration_ms": 5000
+        },
+        {
+          "order": 7,
+          "action": "verify",
+          "assertions": [
+            "Last Result card updated",
+            "Cases created > 0",
+            "Documents created > 0"
+          ]
+        },
+        {
+          "order": 8,
+          "action": "navigate",
+          "target": "/demo-org/cases",
+          "expected_state": "Cases page shows seeded data"
+        }
+      ],
+      "pass_criteria": [
+        "Seed dialog opens and confirms",
+        "Cases created (typically 5)",
+        "Documents created (typically 15)",
+        "Last Result updated"
+      ],
+      "scoring": {
+        "time_weight": 1.0,
+        "retry_penalty": 0.1,
+        "max_retries": 2
+      }
+    },
+    {
+      "id": "task-009",
+      "name": "Reset Seeded Data Safely",
+      "category": "admin",
+      "critical": true,
+      "depends_on": ["task-008"],
+      "description": "Remove only seeded data while preserving other data",
+      "steps": [
+        {
+          "order": 1,
+          "action": "navigate",
+          "target": "/demo-org/admin/seed",
+          "expected_state": "Scenario management page loaded"
+        },
+        {
+          "order": 2,
+          "action": "verify",
+          "assertions": [
+            "Scenario runs table visible",
+            "Reset button available"
+          ]
+        },
+        {
+          "order": 3,
+          "action": "click",
+          "target": "button:has-text('Reset')",
+          "expected_state": "Reset AlertDialog opens"
+        },
+        {
+          "order": 4,
+          "action": "verify",
+          "assertions": [
+            "Dialog title shows 'Reset Scenario Data?'",
+            "Reset Data button visible (red)"
+          ]
+        },
+        {
+          "order": 5,
+          "action": "click",
+          "target": "button:has-text('Reset Data')",
+          "expected_state": "Reset initiated"
+        },
+        {
+          "order": 6,
+          "action": "wait",
+          "duration_ms": 3000
+        },
+        {
+          "order": 7,
+          "action": "navigate",
+          "target": "/demo-org/cases",
+          "expected_state": "Cases page loaded"
+        },
+        {
+          "order": 8,
+          "action": "verify",
+          "assertions": [
+            "Seeded cases removed",
+            "Non-seeded case still present"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Reset dialog opens and confirms",
+        "Seeded data removed",
+        "Non-seeded data preserved",
+        "Last Result cleared"
+      ],
+      "scoring": {
+        "time_weight": 1.0,
+        "retry_penalty": 0.1,
+        "max_retries": 2
+      }
+    },
+    {
+      "id": "task-010",
+      "name": "Recover from Invalid Org Slug",
+      "category": "error_recovery",
+      "critical": false,
+      "depends_on": [],
+      "description": "Handle invalid org slug gracefully and recover",
+      "steps": [
+        {
+          "order": 1,
+          "action": "navigate",
+          "target": "/invalid-org/cases",
+          "expected_state": "Navigation attempted"
+        },
+        {
+          "order": 2,
+          "action": "wait_for_navigation",
+          "expected_url": "/select-org",
+          "timeout_ms": 5000
+        },
+        {
+          "order": 3,
+          "action": "verify",
+          "assertions": [
+            "Redirected to /select-org",
+            "Org selector displayed",
+            "Demo Organization option visible"
+          ]
+        },
+        {
+          "order": 4,
+          "action": "click",
+          "target": "text='Demo Organization'",
+          "expected_state": "Org selected"
+        },
+        {
+          "order": 5,
+          "action": "wait_for_navigation",
+          "expected_url": "/demo-org",
+          "timeout_ms": 3000
+        },
+        {
+          "order": 6,
+          "action": "verify",
+          "assertions": [
+            "Redirected to /demo-org",
+            "Dashboard loaded successfully"
+          ]
+        }
+      ],
+      "pass_criteria": [
+        "Redirects to /select-org (not 404)",
+        "Org selector accessible",
+        "Can select valid org",
+        "Navigation succeeds after selection"
+      ],
+      "scoring": {
+        "time_weight": 0.8,
+        "retry_penalty": 0.1,
+        "max_retries": 2
+      }
+    }
+  ],
+  "scoring_model": {
+    "weights": {
+      "task_completion": 0.6,
+      "correctness": 0.2,
+      "efficiency": 0.1,
+      "robustness": 0.1
+    },
+    "time_baseline_seconds": {
+      "task-001": 10,
+      "task-002": 5,
+      "task-003": 15,
+      "task-004": 10,
+      "task-005": 20,
+      "task-006": 20,
+      "task-007": 10,
+      "task-008": 15,
+      "task-009": 15,
+      "task-010": 10
+    },
+    "pass_threshold": {
+      "min_tasks_passed": 8,
+      "critical_tasks_must_pass": ["task-001", "task-003", "task-005", "task-008"],
+      "max_retries_per_task": 3,
+      "max_human_interventions": 0
+    }
+  },
+  "evidence_collection": {
+    "screenshots": {
+      "per_task": ["initial", "final"],
+      "on_error": true
+    },
+    "console_logs": {
+      "level": "error",
+      "on_error": true
+    },
+    "network_logs": {
+      "failed_requests_only": true
+    }
+  }
+}
