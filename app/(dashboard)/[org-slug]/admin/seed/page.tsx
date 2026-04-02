@@ -11,6 +11,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, Play, RotateCcw, Shield, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +36,9 @@ export default function AdminSeedPage() {
   const [lastResult, setLastResult] = useState<SeedResult | null>(null);
   const [runs, setRuns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSeedDialog, setShowSeedDialog] = useState(false);
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetRunId, setResetRunId] = useState<string | null>(null);
 
   const loadRuns = useCallback(async () => {
     if (!currentOrg) return;
@@ -43,10 +56,9 @@ export default function AdminSeedPage() {
     loadRuns();
   }, [loadRuns]);
 
-  async function handleSeed() {
+  async function executeSeed() {
     if (!currentOrg) return;
-    if (!confirm("This will create sample cases and documents. Continue?")) return;
-
+    setShowSeedDialog(false);
     setIsSeeding(true);
     try {
       const result = await seedScenario(currentOrg.id);
@@ -61,20 +73,29 @@ export default function AdminSeedPage() {
     }
   }
 
-  async function handleReset(runId: string) {
-    if (!confirm("This will delete ALL seeded data for this run. This cannot be undone. Continue?")) {
-      return;
-    }
-
+  async function executeReset() {
+    if (!resetRunId) return;
+    setShowResetDialog(false);
     try {
-      await resetScenario(runId);
+      await resetScenario(resetRunId);
       toast.success("Scenario data reset successfully");
       setLastResult(null);
       await loadRuns();
     } catch (error: any) {
       console.error("Error resetting:", error);
       toast.error(error.message || "Failed to reset scenario");
+    } finally {
+      setResetRunId(null);
     }
+  }
+
+  function handleSeedClick() {
+    setShowSeedDialog(true);
+  }
+
+  function handleResetClick(runId: string) {
+    setResetRunId(runId);
+    setShowResetDialog(true);
   }
 
   if (!currentOrg) {
@@ -127,7 +148,7 @@ export default function AdminSeedPage() {
               <li>Notifications for tracking</li>
             </ul>
             <Button
-              onClick={handleSeed}
+              onClick={handleSeedClick}
               disabled={isSeeding}
               className="w-full"
             >
@@ -224,7 +245,7 @@ export default function AdminSeedPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleReset(run.id)}
+                      onClick={() => handleResetClick(run.id)}
                     >
                       <RotateCcw className="h-4 w-4 mr-2 text-red-500" />
                       Reset
@@ -253,6 +274,51 @@ export default function AdminSeedPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Seed Confirmation Dialog */}
+      <AlertDialog open={showSeedDialog} onOpenChange={setShowSeedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Seed Scenario Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create 5 sample cases with 3 documents each (PDF, CSV, TXT).
+              Real files will be uploaded to storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowSeedDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={executeSeed}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Confirmation Dialog */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">
+              Reset Scenario Data?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete ALL seeded data for this run. Non-seeded data
+              (manually created cases, documents) will be preserved.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowResetDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={executeReset} className="bg-red-600 hover:bg-red-700">
+              Reset Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -119,25 +119,70 @@ test.describe('Portal Gym - Documents', () => {
   test('should upload a document', async ({ page }) => {
     await page.goto(`/${ORG_SLUG}/documents`);
     
-    // Click upload button
+    // Click upload button to open dialog
     await page.click('button:has-text("Upload Document")');
     
-    // Upload a file
-    const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles({
-      name: 'test-document.pdf',
-      mimeType: 'application/pdf',
-      buffer: Buffer.from('Fake PDF content for testing')
-    });
+    // Wait for dialog to be visible
+    await expect(page.locator('text=Upload Document').first()).toBeVisible();
     
-    // Fill document name
-    await page.fill('input[name="name"]', 'Test PDF Document');
+    // Upload a PDF file
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles('/tmp/portal-gym-fixtures/test-document.pdf');
+    
+    // Add description (optional)
+    await page.fill('textarea#description', 'Test PDF Document for Portal Gym');
+    
+    // Submit - click the Upload button inside the dialog
+    await page.locator('button[type="submit"]:has-text("Upload")').click();
+    
+    // Wait for dialog to close and success message
+    await expect(page.locator('text=test-document.pdf')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should upload CSV file', async ({ page }) => {
+    await page.goto(`/${ORG_SLUG}/documents`);
+    
+    // Click upload button to open dialog
+    await page.click('button:has-text("Upload Document")');
+    
+    // Wait for dialog to be visible
+    await expect(page.locator('text=Upload Document').first()).toBeVisible();
+    
+    // Upload a CSV file
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles('/tmp/portal-gym-fixtures/test-data.csv');
+    
+    // Add description
+    await page.fill('textarea#description', 'Test CSV data file');
     
     // Submit
-    await page.click('button:has-text("Upload")');
+    await page.locator('button[type="submit"]:has-text("Upload")').click();
     
     // Should appear in list
-    await expect(page.locator('text=Test PDF Document')).toBeVisible();
+    await expect(page.locator('text=test-data.csv')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should upload TXT file', async ({ page }) => {
+    await page.goto(`/${ORG_SLUG}/documents`);
+    
+    // Click upload button to open dialog
+    await page.click('button:has-text("Upload Document")');
+    
+    // Wait for dialog to be visible
+    await expect(page.locator('text=Upload Document').first()).toBeVisible();
+    
+    // Upload a TXT file
+    const fileInput = page.locator('input[type="file"]');
+    await fileInput.setInputFiles('/tmp/portal-gym-fixtures/test-notes.txt');
+    
+    // Add description
+    await page.fill('textarea#description', 'Test text notes');
+    
+    // Submit
+    await page.locator('button[type="submit"]:has-text("Upload")').click();
+    
+    // Should appear in list
+    await expect(page.locator('text=test-notes.txt')).toBeVisible({ timeout: 10000 });
   });
 });
 
