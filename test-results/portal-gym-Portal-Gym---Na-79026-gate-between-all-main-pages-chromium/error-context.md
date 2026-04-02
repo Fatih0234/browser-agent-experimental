@@ -1,0 +1,187 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: portal-gym.spec.ts >> Portal Gym - Navigation >> should navigate between all main pages
+- Location: playwright-tests/portal-gym.spec.ts:248:7
+
+# Error details
+
+```
+Test timeout of 30000ms exceeded.
+```
+
+```
+Error: page.goto: net::ERR_ABORTED; maybe frame was detached?
+Call log:
+  - navigating to "http://localhost:3001/demo-org/audit-log", waiting until "load"
+
+```
+
+# Test source
+
+```ts
+  158 |     // Submit
+  159 |     await page.locator('button[type="submit"]:has-text("Upload")').click();
+  160 |     
+  161 |     // Should appear in list
+  162 |     await expect(page.locator('text=test-data.csv')).toBeVisible({ timeout: 10000 });
+  163 |   });
+  164 | 
+  165 |   test('should upload TXT file', async ({ page }) => {
+  166 |     await page.goto(`/${ORG_SLUG}/documents`);
+  167 |     
+  168 |     // Click upload button to open dialog
+  169 |     await page.click('button:has-text("Upload Document")');
+  170 |     
+  171 |     // Wait for dialog to be visible
+  172 |     await expect(page.locator('text=Upload Document').first()).toBeVisible();
+  173 |     
+  174 |     // Upload a TXT file
+  175 |     const fileInput = page.locator('input[type="file"]');
+  176 |     await fileInput.setInputFiles('/tmp/portal-gym-fixtures/test-notes.txt');
+  177 |     
+  178 |     // Add description
+  179 |     await page.fill('textarea#description', 'Test text notes');
+  180 |     
+  181 |     // Submit
+  182 |     await page.locator('button[type="submit"]:has-text("Upload")').click();
+  183 |     
+  184 |     // Should appear in list
+  185 |     await expect(page.locator('text=test-notes.txt')).toBeVisible({ timeout: 10000 });
+  186 |   });
+  187 | });
+  188 | 
+  189 | test.describe('Portal Gym - Admin Seed/Reset', () => {
+  190 |   test.beforeEach(async ({ page }) => {
+  191 |     await page.goto('/sign-in');
+  192 |     await page.fill('input[type="email"]', TEST_USER.email);
+  193 |     await page.fill('input[type="password"]', TEST_USER.password);
+  194 |     await page.click('button[type="submit"]');
+  195 |     await page.waitForURL(/\/dashboard/);
+  196 |   });
+  197 | 
+  198 |   test('should display scenario management page', async ({ page }) => {
+  199 |     await page.goto(`/${ORG_SLUG}/admin/seed`);
+  200 |     
+  201 |     await expect(page.locator('text=Scenario Management')).toBeVisible();
+  202 |     await expect(page.locator('button:has-text("Seed Data")')).toBeVisible();
+  203 |   });
+  204 | 
+  205 |   test('should seed scenario data', async ({ page }) => {
+  206 |     await page.goto(`/${ORG_SLUG}/admin/seed`);
+  207 |     
+  208 |     // Click seed button
+  209 |     await page.click('button:has-text("Seed Data")');
+  210 |     
+  211 |     // Handle confirmation dialog
+  212 |     page.on('dialog', dialog => dialog.accept());
+  213 |     
+  214 |     // Wait for seeding to complete
+  215 |     await expect(page.locator('text=Seeded')).toBeVisible({ timeout: 30000 });
+  216 |     
+  217 |     // Verify cases were created
+  218 |     await page.goto(`/${ORG_SLUG}/cases`);
+  219 |     await expect(page.locator('text=No cases yet')).not.toBeVisible();
+  220 |   });
+  221 | 
+  222 |   test('should reset scenario data safely', async ({ page }) => {
+  223 |     await page.goto(`/${ORG_SLUG}/admin/seed`);
+  224 |     
+  225 |     // Find and click reset button for a completed run
+  226 |     const resetButton = page.locator('button:has-text("Reset")').first();
+  227 |     if (await resetButton.isVisible()) {
+  228 |       await resetButton.click();
+  229 |       
+  230 |       // Handle confirmation dialog
+  231 |       page.on('dialog', dialog => dialog.accept());
+  232 |       
+  233 |       // Should show success
+  234 |       await expect(page.locator('text=reset successfully')).toBeVisible();
+  235 |     }
+  236 |   });
+  237 | });
+  238 | 
+  239 | test.describe('Portal Gym - Navigation', () => {
+  240 |   test.beforeEach(async ({ page }) => {
+  241 |     await page.goto('/sign-in');
+  242 |     await page.fill('input[type="email"]', TEST_USER.email);
+  243 |     await page.fill('input[type="password"]', TEST_USER.password);
+  244 |     await page.click('button[type="submit"]');
+  245 |     await page.waitForURL(/\/dashboard/);
+  246 |   });
+  247 | 
+  248 |   test('should navigate between all main pages', async ({ page }) => {
+  249 |     const pages = [
+  250 |       { name: 'Cases', path: `/${ORG_SLUG}/cases` },
+  251 |       { name: 'Documents', path: `/${ORG_SLUG}/documents` },
+  252 |       { name: 'Notifications', path: `/${ORG_SLUG}/notifications` },
+  253 |       { name: 'Audit Log', path: `/${ORG_SLUG}/audit-log` },
+  254 |       { name: 'Admin', path: `/${ORG_SLUG}/admin/seed` },
+  255 |     ];
+  256 | 
+  257 |     for (const nav of pages) {
+> 258 |       await page.goto(nav.path);
+      |                  ^ Error: page.goto: net::ERR_ABORTED; maybe frame was detached?
+  259 |       await expect(page.locator(`text=${nav.name}`).first()).toBeVisible();
+  260 |     }
+  261 |   });
+  262 | 
+  263 |   test('should show org switcher with correct org', async ({ page }) => {
+  264 |     await page.goto(`/${ORG_SLUG}/cases`);
+  265 |     
+  266 |     // Org selector should show current org
+  267 |     await expect(page.locator('text=Demo Organization')).toBeVisible();
+  268 |   });
+  269 | 
+  270 |   test('should sign out successfully', async ({ page }) => {
+  271 |     await page.goto(`/${ORG_SLUG}/cases`);
+  272 |     
+  273 |     // Click sign out
+  274 |     await page.click('button:has-text("Sign Out")');
+  275 |     
+  276 |     // Should redirect to sign-in
+  277 |     await expect(page).toHaveURL(/\/sign-in/);
+  278 |   });
+  279 | });
+  280 | 
+  281 | test.describe('Portal Gym - Audit Log', () => {
+  282 |   test.beforeEach(async ({ page }) => {
+  283 |     await page.goto('/sign-in');
+  284 |     await page.fill('input[type="email"]', TEST_USER.email);
+  285 |     await page.fill('input[type="password"]', TEST_USER.password);
+  286 |     await page.click('button[type="submit"]');
+  287 |     await page.waitForURL(/\/dashboard/);
+  288 |   });
+  289 | 
+  290 |   test('should display audit log entries', async ({ page }) => {
+  291 |     await page.goto(`/${ORG_SLUG}/audit-log`);
+  292 |     
+  293 |     // Should show audit log heading
+  294 |     await expect(page.locator('text=Audit Log')).toBeVisible();
+  295 |     
+  296 |     // Table or list should be present
+  297 |     await expect(page.locator('table, [role="list"]').first()).toBeVisible();
+  298 |   });
+  299 | 
+  300 |   test('should log case creation events', async ({ page }) => {
+  301 |     // Create a case first
+  302 |     await page.goto(`/${ORG_SLUG}/cases`);
+  303 |     await page.click('button:has-text("New Case")');
+  304 |     await page.fill('input[name="title"]', 'Audit Test Case');
+  305 |     await page.fill('textarea[name="description"]', 'Testing audit logging');
+  306 |     await page.click('button:has-text("Create Case")');
+  307 |     
+  308 |     // Check audit log
+  309 |     await page.goto(`/${ORG_SLUG}/audit-log`);
+  310 |     
+  311 |     // Should show case creation event
+  312 |     await expect(page.locator('text=case_created, text=Audit Test Case').first()).toBeVisible();
+  313 |   });
+  314 | });
+  315 | 
+```

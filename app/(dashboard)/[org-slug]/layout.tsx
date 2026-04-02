@@ -28,10 +28,18 @@ export default async function OrgSlugLayout({
       // Fetch user's organizations to validate access
       const { data: memberships } = await supabase
         .from("memberships")
-        .select("organizations:org_id(slug)")
+        .select("org_id")
         .eq("user_id", user.id);
 
-      userOrgs = memberships?.map((m: any) => m.organizations) || [];
+      if (memberships && memberships.length > 0) {
+        const orgIds = memberships.map((m) => m.org_id);
+        const { data: orgs } = await supabase
+          .from("organizations")
+          .select("slug")
+          .in("id", orgIds);
+
+        userOrgs = orgs || [];
+      }
     }
   } catch {
     // Supabase not configured or other error
