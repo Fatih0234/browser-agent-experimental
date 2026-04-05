@@ -9,8 +9,10 @@ import {
   FileText,
   Bell,
   ClipboardList,
-  Settings,
   Shield,
+  Truck,
+  ShoppingBag,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +51,21 @@ export function NavSidebar() {
       label: "Notifications",
       href: `${basePath}/notifications`,
       icon: <Bell className="h-4 w-4" />,
+    },
+    {
+      label: "Logistics",
+      href: `${basePath}/logistics`,
+      icon: <Truck className="h-4 w-4" />,
+    },
+    {
+      label: "Marketplace",
+      href: `${basePath}/marketplace`,
+      icon: <ShoppingBag className="h-4 w-4" />,
+    },
+    {
+      label: "HR Portal",
+      href: `${basePath}/hr`,
+      icon: <Users className="h-4 w-4" />,
     },
     {
       label: "Audit Log",

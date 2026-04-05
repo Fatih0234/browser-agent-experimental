@@ -15,5 +15,5 @@ console.log("Supabase client initialized with URL:", url?.slice(0, 30) + "...");
 console.log("Key present:", !!key);
 
 export function createClient() {
-  return createBrowserClient(url, key);
+  return createBrowserClient(url!, key!);
 }

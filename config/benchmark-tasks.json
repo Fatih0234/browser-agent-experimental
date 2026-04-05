@@ -1,5 +1,5 @@
 {
-  "benchmark_version": "1.0.0",
+  "benchmark_version": "2.0.0",
   "benchmark_name": "Portal Gym V1",
   "description": "Browser agent capability assessment for multi-tenant SaaS application",
   "base_url": "http://localhost:3001",
@@ -634,6 +634,320 @@
         "retry_penalty": 0.1,
         "max_retries": 2
       }
+    },
+    {
+      "id": "task-011",
+      "name": "Create New Shipment",
+      "category": "logistics",
+      "critical": true,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Navigate to Logistics, fill out the new shipment form with carrier, service type, addresses, and create a shipment",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/logistics/new", "expected_state": "New shipment form loaded" },
+        { "order": 2, "action": "select", "target": "#carrier", "value": "dhl", "expected_state": "DHL selected" },
+        { "order": 3, "action": "select", "target": "#service-type", "value": "express", "expected_state": "Express selected" },
+        { "order": 4, "action": "fill", "target": "#weight", "value": "3.5" },
+        { "order": 5, "action": "fill", "target": "#origin-name", "value": "Test GmbH" },
+        { "order": 6, "action": "fill", "target": "#origin-street", "value": "Teststraße 1" },
+        { "order": 7, "action": "fill", "target": "#origin-zip", "value": "10115" },
+        { "order": 8, "action": "fill", "target": "#origin-city", "value": "Berlin" },
+        { "order": 9, "action": "fill", "target": "#destination-name", "value": "Empfänger GmbH" },
+        { "order": 10, "action": "fill", "target": "#destination-street", "value": "Zielweg 5" },
+        { "order": 11, "action": "fill", "target": "#destination-zip", "value": "80331" },
+        { "order": 12, "action": "fill", "target": "#destination-city", "value": "München" },
+        { "order": 13, "action": "click", "target": "button:has-text('Create Shipment')", "expected_state": "Shipment created, redirected to detail" },
+        { "order": 14, "action": "verify", "assertions": ["Tracking number visible", "Status shows 'draft'", "DHL badge visible"] }
+      ],
+      "pass_criteria": ["Shipment created successfully", "Redirected to shipment detail page", "Tracking number assigned"],
+      "scoring": { "time_weight": 1.0, "retry_penalty": 0.1, "max_retries": 3 }
+    },
+    {
+      "id": "task-012",
+      "name": "Find Shipment by Tracking Number",
+      "category": "logistics",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Navigate to Logistics shipment list and locate a specific seeded shipment using the carrier filter",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/logistics", "expected_state": "Logistics shipment list loaded" },
+        { "order": 2, "action": "select", "target": "#carrier-filter", "value": "dhl", "expected_state": "Filtered by DHL" },
+        { "order": 3, "action": "verify", "assertions": ["Only DHL shipments shown", "Tracking numbers start with JD"] },
+        { "order": 4, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Shipment detail opened" },
+        { "order": 5, "action": "verify", "assertions": ["Tracking number visible in heading", "DHL carrier badge visible"] }
+      ],
+      "pass_criteria": ["Filter applied correctly", "DHL shipment found", "Shipment detail accessible"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-013",
+      "name": "Update Shipment Status to Delivered",
+      "category": "logistics",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Open a booked shipment and update its status to 'delivered'",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/logistics", "expected_state": "Logistics list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "booked", "expected_state": "Filter applied" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Shipment detail opened" },
+        { "order": 4, "action": "select", "target": "#update-status", "value": "delivered", "expected_state": "Delivered selected" },
+        { "order": 5, "action": "click", "target": "button:has-text('Update')", "expected_state": "Status updated" },
+        { "order": 6, "action": "verify", "assertions": ["Status badge now shows 'delivered'", "Actual delivery date populated"] }
+      ],
+      "pass_criteria": ["Status updated to delivered", "Actual delivery date set automatically"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-014",
+      "name": "Download Invoice from Shipment Detail",
+      "category": "logistics",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Navigate to a delivered shipment and download its invoice",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/logistics", "expected_state": "Logistics list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "delivered", "expected_state": "Filter applied" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Shipment detail opened" },
+        { "order": 4, "action": "verify", "assertions": ["Invoices section visible", "At least one invoice listed"] },
+        { "order": 5, "action": "click", "target": "button:has-text('Download')", "expected_state": "Download triggered" }
+      ],
+      "pass_criteria": ["Shipment detail loaded", "Invoice table visible", "Download button clickable"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-015",
+      "name": "Filter Shipments by Carrier and Count",
+      "category": "logistics",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Filter the shipment list by carrier 'ups' and verify the count in the table header",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/logistics", "expected_state": "Logistics list loaded" },
+        { "order": 2, "action": "select", "target": "#carrier-filter", "value": "ups", "expected_state": "UPS filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["Table header shows count > 0", "All visible rows have UPS badge"] }
+      ],
+      "pass_criteria": ["Filter applied", "Only UPS shipments visible", "Count accurate"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-016",
+      "name": "Navigate Pagination on Shipment List",
+      "category": "logistics",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Verify pagination controls work when more than 15 shipments exist (seed multiple runs if needed)",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/logistics", "expected_state": "Logistics list loaded" },
+        { "order": 2, "action": "verify", "assertions": ["Shipment list visible", "Total count shown in header"] },
+        { "order": 3, "action": "conditional_click", "target": "button:has-text('Next')", "condition": "enabled", "expected_state": "Second page loaded or pagination absent" },
+        { "order": 4, "action": "verify", "assertions": ["Page number updated or all items on one page"] }
+      ],
+      "pass_criteria": ["Pagination works correctly if multiple pages exist", "Handles single-page case gracefully"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-017",
+      "name": "Find All Pending Orders Across Channels",
+      "category": "marketplace",
+      "critical": true,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Navigate to Marketplace orders, filter by status 'pending', count total pending orders",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/marketplace/orders", "expected_state": "Orders list loaded" },
+        { "order": 2, "action": "select", "target": "#order-status-filter", "value": "pending", "expected_state": "Filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["All visible orders show 'pending' badge", "Total count visible in header"] },
+        { "order": 4, "action": "capture_state", "key": "pending_order_count", "selector": "text=/Orders \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Orders filtered by pending status", "Count captured correctly"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 3 }
+    },
+    {
+      "id": "task-018",
+      "name": "Update Order Status to Shipped",
+      "category": "marketplace",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Find a pending Amazon order and update its status to shipped using the inline status dropdown in the orders table",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/marketplace/orders", "expected_state": "Orders list loaded" },
+        { "order": 2, "action": "select", "target": "#marketplace-filter", "value": "amazon", "expected_state": "Amazon filter applied" },
+        { "order": 3, "action": "select", "target": "#order-status-filter", "value": "pending", "expected_state": "Pending filter applied" },
+        { "order": 4, "action": "select", "target": "table tbody tr:first-child select", "value": "shipped", "expected_state": "Status changed in dropdown" },
+        { "order": 5, "action": "verify", "assertions": ["Row badge updated to 'shipped'", "Toast notification visible"] }
+      ],
+      "pass_criteria": ["Order found", "Status updated to shipped", "Badge updated in table"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-019",
+      "name": "Change Listing Price",
+      "category": "marketplace",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Navigate to Marketplace listings, find an active listing, and update its price",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/marketplace/listings", "expected_state": "Listings table loaded" },
+        { "order": 2, "action": "select", "target": "#listings-status-filter", "value": "active", "expected_state": "Active filter applied" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child button:has-text('Edit')", "expected_state": "Edit mode activated, price field editable" },
+        { "order": 4, "action": "fill", "target": "table tbody tr:first-child input[id^='price-']", "value": "99.99", "expected_state": "Price field updated" },
+        { "order": 5, "action": "click", "target": "button:has-text('Save')", "expected_state": "Listing saved" },
+        { "order": 6, "action": "verify", "assertions": ["Price shows 99.99 in table", "Edit button visible again"] }
+      ],
+      "pass_criteria": ["Edit mode entered", "Price updated successfully", "Table reflects new price"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-020",
+      "name": "Download Orders CSV Report",
+      "category": "marketplace",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Navigate to Marketplace reports and generate a live orders CSV for Amazon",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/marketplace/reports", "expected_state": "Reports page loaded" },
+        { "order": 2, "action": "verify", "assertions": ["Generate Live Orders Report section visible", "Amazon, eBay, OTTO buttons present"] },
+        { "order": 3, "action": "click", "target": "button:has-text('AMAZON Orders CSV')", "expected_state": "Download triggered" },
+        { "order": 4, "action": "verify", "assertions": ["Success toast shown", "Download initiated"] }
+      ],
+      "pass_criteria": ["Reports page loads", "CSV generation button clicked", "Download starts"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-021",
+      "name": "Filter Orders by Date Range",
+      "category": "marketplace",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Apply a date range filter on the orders page to find orders from a specific period",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/marketplace/orders", "expected_state": "Orders list loaded" },
+        { "order": 2, "action": "fill", "target": "#from-date", "value": "2026-01-01" },
+        { "order": 3, "action": "fill", "target": "#to-date", "value": "2026-12-31" },
+        { "order": 4, "action": "verify", "assertions": ["Order count updated", "Visible orders fall within date range"] }
+      ],
+      "pass_criteria": ["Date filters applied", "Results filtered correctly"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-022",
+      "name": "Find Listings with Low Stock",
+      "category": "marketplace",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Navigate to listings, identify products with stock below threshold (indicated by warning icon)",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/marketplace/listings", "expected_state": "Listings table loaded" },
+        { "order": 2, "action": "verify", "assertions": ["Low stock warning banner visible", "Warning icon (⚠) present on low-stock rows"] },
+        { "order": 3, "action": "capture_state", "key": "low_stock_listings", "selector": "text=/\\d+ active listing.*low stock/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Low stock banner visible", "Low stock count captured from banner"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-023",
+      "name": "Find Employee by Department",
+      "category": "hr",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Navigate to HR Portal, filter employees by the Engineering department, and count results",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/hr", "expected_state": "HR Portal employee list loaded" },
+        { "order": 2, "action": "select", "target": "#employee-dept-filter", "value": "Engineering", "expected_state": "Engineering filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["All visible employees are in Engineering department", "Count > 0"] },
+        { "order": 4, "action": "capture_state", "key": "engineering_count", "selector": "text=/Employees \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Department filter applied", "Only Engineering employees visible"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-024",
+      "name": "Create Sick Note Submission (Multi-Step Wizard)",
+      "category": "hr",
+      "critical": true,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Complete the 4-step HR submission wizard to create a sick note for an employee",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/hr/submissions/new", "expected_state": "Step 1 of wizard loaded" },
+        { "order": 2, "action": "click", "target": "button[type='button']:has-text('Sick Note')", "expected_state": "Sick Note type selected (highlighted)" },
+        { "order": 3, "action": "click", "target": "button:has-text('Continue')", "expected_state": "Step 2 loaded" },
+        { "order": 4, "action": "select", "target": "#employee-select", "value_strategy": "first_available", "expected_state": "Employee selected" },
+        { "order": 5, "action": "click", "target": "button:has-text('Continue')", "expected_state": "Step 3 loaded" },
+        { "order": 6, "action": "fill", "target": "#start_date", "value": "2026-04-07" },
+        { "order": 7, "action": "fill", "target": "#end_date", "value": "2026-04-09" },
+        { "order": 8, "action": "click", "target": "button:has-text('Continue')", "expected_state": "Step 4 review loaded" },
+        { "order": 9, "action": "verify", "assertions": ["Review shows Sick Note type", "Start and end dates visible"] },
+        { "order": 10, "action": "click", "target": "button:has-text('Save as Draft')", "expected_state": "Submission created" },
+        { "order": 11, "action": "verify", "assertions": ["Redirected to submission detail", "Status shows 'draft'"] }
+      ],
+      "pass_criteria": ["All 4 steps completed", "Submission created as draft", "Detail page loads with correct data"],
+      "scoring": { "time_weight": 1.0, "retry_penalty": 0.15, "max_retries": 3 }
+    },
+    {
+      "id": "task-025",
+      "name": "Submit a Draft Submission",
+      "category": "hr",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Find a seeded draft submission in the HR portal and submit it to trigger status transition",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/hr/submissions", "expected_state": "Submissions list loaded" },
+        { "order": 2, "action": "select", "target": "#submission-status-filter", "value": "draft", "expected_state": "Draft filter applied" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child td:first-child a", "expected_state": "Submission detail opened" },
+        { "order": 4, "action": "verify", "assertions": ["Status shows 'draft'", "'Submit to Portal' button visible"] },
+        { "order": 5, "action": "click", "target": "button:has-text('Submit to Portal')", "expected_state": "Submission submitted" },
+        { "order": 6, "action": "verify", "assertions": ["Status badge updated to 'submitted'", "Reference number generated and visible"] }
+      ],
+      "pass_criteria": ["Draft submission found", "Submitted successfully", "Reference number visible after submission"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-026",
+      "name": "Check Reference Number of Approved Submission",
+      "category": "hr",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Find an approved HR submission and record its reference number",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/hr/submissions", "expected_state": "Submissions list loaded" },
+        { "order": 2, "action": "select", "target": "#submission-status-filter", "value": "approved", "expected_state": "Approved filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["At least one approved submission visible", "Reference number column populated"] },
+        { "order": 4, "action": "capture_state", "key": "reference_number", "selector": "table tbody tr:first-child td:nth-child(5)", "pattern": ".*" },
+        { "order": 5, "action": "click", "target": "table tbody tr:first-child td:first-child a", "expected_state": "Detail opened" },
+        { "order": 6, "action": "verify", "assertions": ["Reference number matches captured value", "Status shows 'approved'"] }
+      ],
+      "pass_criteria": ["Approved submission found", "Reference number captured", "Detail page shows matching reference"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-027",
+      "name": "Navigate to Employee Detail from Submission",
+      "category": "hr",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "From a submission detail page, navigate to the linked employee record via the employee name link",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/hr/submissions", "expected_state": "Submissions list loaded" },
+        { "order": 2, "action": "click", "target": "table tbody tr:first-child td:first-child a", "expected_state": "Submission detail opened" },
+        { "order": 3, "action": "click", "target": "a[href*='/hr/employees/']", "expected_state": "Employee detail opened" },
+        { "order": 4, "action": "verify", "assertions": ["Employee name visible in heading", "Employee number shown", "Submissions section present"] }
+      ],
+      "pass_criteria": ["Submission detail navigated", "Employee link followed", "Employee detail page loads"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-028",
+      "name": "Filter Submissions by Kurzarbeit Type and Count",
+      "category": "hr",
+      "critical": false,
+      "depends_on": ["task-008"],
+      "description": "Filter HR submissions by type 'Kurzarbeit' and count the number of results",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/hr/submissions", "expected_state": "Submissions list loaded" },
+        { "order": 2, "action": "select", "target": "#submission-type-filter", "value": "kurzarbeit", "expected_state": "Kurzarbeit filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["All visible submissions show 'Kurzarbeit' type", "Count in header > 0"] },
+        { "order": 4, "action": "capture_state", "key": "kurzarbeit_count", "selector": "text=/All Submissions \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Filter applied successfully", "Only Kurzarbeit submissions visible", "Count captured"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
     }
   ],
   "scoring_model": {
@@ -653,11 +967,29 @@
       "task-007": 10,
       "task-008": 15,
       "task-009": 15,
-      "task-010": 10
+      "task-010": 10,
+      "task-011": 30,
+      "task-012": 10,
+      "task-013": 12,
+      "task-014": 10,
+      "task-015": 8,
+      "task-016": 8,
+      "task-017": 10,
+      "task-018": 10,
+      "task-019": 12,
+      "task-020": 10,
+      "task-021": 8,
+      "task-022": 8,
+      "task-023": 8,
+      "task-024": 35,
+      "task-025": 12,
+      "task-026": 10,
+      "task-027": 8,
+      "task-028": 8
     },
     "pass_threshold": {
-      "min_tasks_passed": 8,
-      "critical_tasks_must_pass": ["task-001", "task-003", "task-005", "task-008"],
+      "min_tasks_passed": 18,
+      "critical_tasks_must_pass": ["task-001", "task-003", "task-005", "task-008", "task-011", "task-017", "task-024"],
       "max_retries_per_task": 3,
       "max_human_interventions": 0
     }

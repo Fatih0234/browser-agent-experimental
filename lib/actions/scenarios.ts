@@ -101,6 +101,11 @@ export interface SeedResult {
   casesCreated: number;
   documentsCreated: number;
   notificationsCreated: number;
+  shipmentsCreated: number;
+  listingsCreated: number;
+  ordersCreated: number;
+  employeesCreated: number;
+  hrSubmissionsCreated: number;
 }
 
 export async function seedScenario(orgId: string): Promise<SeedResult> {
@@ -334,6 +339,172 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
 
     if (notifError) throw notifError;
 
+    // ============================================
+    // SEED LOGISTICS: 6 shipments + 3 invoices
+    // ============================================
+    const shipmentStatuses = ["booked", "booked", "in_transit", "in_transit", "delivered", "delivered"] as const;
+    const carriers = ["dhl", "ups", "fedex", "dpd", "dhl", "ups"] as const;
+    const shipmentsData = shipmentStatuses.map((status, i) => ({
+      org_id: orgId,
+      tracking_number: `${["JD", "1Z", "FX", "DP", "JD", "1Z"][i]}${String(Math.floor(Math.random() * 1e12)).padStart(12, "0")}`,
+      carrier: carriers[i],
+      status,
+      origin: { name: "Portal Gym GmbH", street: "Musterstraße 1", city: "Berlin", zip: "10115", country: "DE" },
+      destination: { name: `Kunde ${i + 1}`, street: `Lieferstraße ${i + 10}`, city: ["München", "Hamburg", "Köln", "Frankfurt", "Stuttgart", "Düsseldorf"][i], zip: ["80331", "20095", "50667", "60311", "70173", "40213"][i], country: "DE" },
+      weight_kg: (1 + i * 0.75).toFixed(2),
+      service_type: ["standard", "express", "standard", "economy", "overnight", "standard"][i],
+      pickup_date: new Date(Date.now() - (i + 1) * 2 * 86400000).toISOString().split("T")[0],
+      estimated_delivery: new Date(Date.now() + (5 - i) * 86400000).toISOString().split("T")[0],
+      actual_delivery: status === "delivered" ? new Date(Date.now() - 86400000).toISOString().split("T")[0] : null,
+      created_by: user.id,
+      seed_run_id: runId,
+    }));
+
+    const { data: createdShipments } = await supabase.from("shipments").insert(shipmentsData).select();
+
+    // Invoices for delivered shipments
+    const invoicesData = (createdShipments || [])
+      .filter((s) => s.status === "delivered")
+      .map((s, i) => ({
+        org_id: orgId,
+        shipment_id: s.id,
+        invoice_number: `INV-${new Date().getFullYear()}-${String(1000 + i).padStart(4, "0")}`,
+        amount: (18.5 + i * 4.75).toFixed(2),
+        currency: "EUR",
+        issued_date: new Date(Date.now() - i * 86400000).toISOString().split("T")[0],
+        seed_run_id: runId,
+      }));
+
+    await supabase.from("shipment_invoices").insert(invoicesData);
+
+    // ============================================
+    // SEED MARKETPLACE: 2 channels × 4 listings × 6 orders
+    // ============================================
+    const marketplaces = ["amazon", "ebay"] as const;
+    const listingTitles = [
+      "Stehlampe LED Dimmbar 150cm",
+      "Kaffeemaschine Vollautomatisch",
+      "Laptoptasche 15 Zoll Business",
+      "Bluetooth Headset Office Pro",
+    ];
+    const listingStatuses = ["active", "active", "active", "inactive"] as const;
+    const prices = [89.99, 349.0, 54.99, 129.0];
+
+    const listingsData = marketplaces.flatMap((mp, mpi) =>
+      listingTitles.map((title, li) => ({
+        org_id: orgId,
+        marketplace: mp,
+        external_id: `${mp.toUpperCase()}-${String(mpi * 100 + li + 1).padStart(6, "0")}`,
+        title,
+        status: listingStatuses[li],
+        price: prices[li],
+        stock_qty: [12, 3, 45, 0][li],
+        seed_run_id: runId,
+      }))
+    );
+
+    const { data: createdListings } = await supabase.from("marketplace_listings").insert(listingsData).select();
+
+    const orderStatuses = ["pending", "shipped", "delivered", "returned", "pending", "delivered"] as const;
+    const customerNames = ["Hans Müller", "Anna Schmidt", "Klaus Weber", "Maria Fischer", "Peter Wagner", "Sabine Koch"];
+    const ordersData = (createdListings || []).flatMap((listing) =>
+      orderStatuses.map((status, oi) => ({
+        org_id: orgId,
+        marketplace: listing.marketplace,
+        order_number: `${listing.marketplace.toUpperCase()}-ORD-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+        listing_id: listing.id,
+        quantity: 1 + (oi % 3),
+        total_amount: (listing.price * (1 + oi % 3)).toFixed(2),
+        currency: "EUR",
+        status,
+        customer_name: customerNames[oi],
+        ordered_at: new Date(Date.now() - oi * 3 * 86400000).toISOString(),
+        seed_run_id: runId,
+      }))
+    );
+
+    const { data: createdOrders } = await supabase.from("marketplace_orders").insert(ordersData).select();
+
+    // Seed 2 stored reports (CSV content as text)
+    const reportsCsvContent = ["amazon", "ebay"].map((mp) => {
+      const header = "order_number,customer_name,quantity,total_amount,currency,status,ordered_at";
+      const rows = (createdOrders || [])
+        .filter((o) => o.marketplace === mp)
+        .slice(0, 5)
+        .map((o) => `${o.order_number},"${o.customer_name}",${o.quantity},${o.total_amount},${o.currency},${o.status},${o.ordered_at}`)
+        .join("\n");
+      return { mp, csv: `${header}\n${rows}` };
+    });
+
+    for (const { mp, csv } of reportsCsvContent) {
+      const path = `${orgId}/reports/${mp}-orders-seed.csv`;
+      const { error: uploadErr } = await supabase.storage
+        .from("documents")
+        .upload(path, new TextEncoder().encode(csv), { contentType: "text/csv", upsert: true });
+
+      if (!uploadErr) {
+        const now = new Date();
+        await supabase.from("marketplace_reports").insert({
+          org_id: orgId,
+          marketplace: mp,
+          report_type: "orders",
+          period_start: new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split("T")[0],
+          period_end: new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split("T")[0],
+          storage_path: path,
+          seed_run_id: runId,
+        });
+      }
+    }
+
+    // ============================================
+    // SEED HR: 8 employees + 6 submissions
+    // ============================================
+    const employeesData = [
+      { first_name: "Anna", last_name: "Bauer", position: "Software Engineer", department: "Engineering", hire_date: "2021-03-15", status: "active" },
+      { first_name: "Klaus", last_name: "Richter", position: "Marketing Manager", department: "Marketing", hire_date: "2019-07-01", status: "active" },
+      { first_name: "Maria", last_name: "Hoffmann", position: "Accountant", department: "Finance", hire_date: "2020-01-10", status: "active" },
+      { first_name: "Thomas", last_name: "Koch", position: "Sales Rep", department: "Sales", hire_date: "2022-09-20", status: "on_leave" },
+      { first_name: "Sarah", last_name: "Wolf", position: "HR Specialist", department: "HR", hire_date: "2018-05-14", status: "active" },
+      { first_name: "Michael", last_name: "Braun", position: "DevOps Engineer", department: "Engineering", hire_date: "2023-01-03", status: "active" },
+      { first_name: "Julia", last_name: "Schulz", position: "Product Manager", department: "Product", hire_date: "2020-11-22", status: "active" },
+      { first_name: "Stefan", last_name: "Meyer", position: "Sales Manager", department: "Sales", hire_date: "2017-04-08", status: "terminated" },
+    ].map((e, i) => ({
+      ...e,
+      org_id: orgId,
+      employee_number: `EMP-${String(1000 + i).padStart(4, "0")}`,
+      seed_run_id: runId,
+    }));
+
+    const { data: createdEmployees } = await supabase.from("employees").insert(employeesData).select();
+
+    const hrSubmissionsData: any[] = [];
+    if (createdEmployees && createdEmployees.length >= 6) {
+      const submissionTemplates = [
+        { employee_idx: 0, type: "sick_note", status: "approved", reference_number: `AU-${new Date().getFullYear()}-100001`, metadata: { start_date: "2026-03-10", end_date: "2026-03-14", diagnosis_code: "J06.9" } },
+        { employee_idx: 1, type: "sick_note", status: "submitted", reference_number: `AU-${new Date().getFullYear()}-100002`, metadata: { start_date: "2026-04-01", end_date: "2026-04-03", diagnosis_code: "M54.5" } },
+        { employee_idx: 2, type: "kurzarbeit", status: "in_review", reference_number: `KUG-${new Date().getFullYear()}-200001`, metadata: { start_date: "2026-04-01", affected_employees: "12", reason: "Seasonal downturn in orders" } },
+        { employee_idx: 3, type: "kurzarbeit", status: "rejected", reference_number: `KUG-${new Date().getFullYear()}-200002`, metadata: { start_date: "2026-02-01", affected_employees: "5", reason: "Production slowdown" } },
+        { employee_idx: 4, type: "hiring_support", status: "approved", reference_number: `EFZ-${new Date().getFullYear()}-300001`, metadata: { position_title: "Junior Engineer", start_date: "2026-05-01", grant_type: "Eingliederungszuschuss" } },
+        { employee_idx: 5, type: "hiring_support", status: "draft", reference_number: null, metadata: { position_title: "Sales Trainee", start_date: "2026-06-01" } },
+      ] as const;
+
+      for (const tmpl of submissionTemplates) {
+        hrSubmissionsData.push({
+          org_id: orgId,
+          employee_id: createdEmployees[tmpl.employee_idx].id,
+          submission_type: tmpl.type,
+          status: tmpl.status,
+          reference_number: tmpl.reference_number,
+          submitted_at: tmpl.status !== "draft" ? new Date(Date.now() - 7 * 86400000).toISOString() : null,
+          metadata: tmpl.metadata,
+          created_by: user.id,
+          seed_run_id: runId,
+        });
+      }
+    }
+
+    const { data: createdHrSubmissions } = await supabase.from("hr_submissions").insert(hrSubmissionsData).select();
+
     // Log audit event
     await supabase.from("audit_events").insert({
       org_id: orgId,
@@ -345,6 +516,11 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
         cases_created: createdCases?.length || 0,
         documents_created: createdDocs?.length || 0,
         notifications_created: createdNotifications?.length || 0,
+        shipments_created: createdShipments?.length || 0,
+        listings_created: createdListings?.length || 0,
+        orders_created: createdOrders?.length || 0,
+        employees_created: createdEmployees?.length || 0,
+        hr_submissions_created: createdHrSubmissions?.length || 0,
       },
     });
 
@@ -357,7 +533,12 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
         created_count:
           (createdCases?.length || 0) +
           (createdDocs?.length || 0) +
-          (createdNotifications?.length || 0),
+          (createdNotifications?.length || 0) +
+          (createdShipments?.length || 0) +
+          (createdListings?.length || 0) +
+          (createdOrders?.length || 0) +
+          (createdEmployees?.length || 0) +
+          (createdHrSubmissions?.length || 0),
       })
       .eq("id", runId);
 
@@ -365,10 +546,15 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
 
     return {
       runId,
-      organizationsCreated: 0, // Using existing org
+      organizationsCreated: 0,
       casesCreated: createdCases?.length || 0,
       documentsCreated: createdDocs?.length || 0,
       notificationsCreated: createdNotifications?.length || 0,
+      shipmentsCreated: createdShipments?.length || 0,
+      listingsCreated: createdListings?.length || 0,
+      ordersCreated: createdOrders?.length || 0,
+      employeesCreated: createdEmployees?.length || 0,
+      hrSubmissionsCreated: createdHrSubmissions?.length || 0,
     };
   } catch (error) {
     // Update scenario run to failed
@@ -440,6 +626,14 @@ export async function resetScenario(runId: string): Promise<void> {
   await supabase.from("document_versions").delete().eq("seed_run_id", runId);
   await supabase.from("documents").delete().eq("seed_run_id", runId);
   await supabase.from("cases").delete().eq("seed_run_id", runId);
+  // Portal module tables
+  await supabase.from("hr_submissions").delete().eq("seed_run_id", runId);
+  await supabase.from("employees").delete().eq("seed_run_id", runId);
+  await supabase.from("marketplace_reports").delete().eq("seed_run_id", runId);
+  await supabase.from("marketplace_orders").delete().eq("seed_run_id", runId);
+  await supabase.from("marketplace_listings").delete().eq("seed_run_id", runId);
+  await supabase.from("shipment_invoices").delete().eq("seed_run_id", runId);
+  await supabase.from("shipments").delete().eq("seed_run_id", runId);
   await supabase.from("scenario_runs").delete().eq("id", runId);
 
   // Log audit event
