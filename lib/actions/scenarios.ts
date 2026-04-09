@@ -106,6 +106,15 @@ export interface SeedResult {
   ordersCreated: number;
   employeesCreated: number;
   hrSubmissionsCreated: number;
+  companiesCreated: number;
+  tendersCreated: number;
+  submissionsCreated: number;
+  taxFilingsCreated: number;
+  disclosuresCreated: number;
+  reconciliationMatchesCreated: number;
+  customsDeclarationsCreated: number;
+  customsDocumentsCreated: number;
+  customsExceptionsCreated: number;
 }
 
 export async function seedScenario(orgId: string): Promise<SeedResult> {
@@ -375,7 +384,7 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
         seed_run_id: runId,
       }));
 
-    await supabase.from("shipment_invoices").insert(invoicesData);
+    const { data: createdShipmentInvoices } = await supabase.from("shipment_invoices").insert(invoicesData).select();
 
     // ============================================
     // SEED MARKETPLACE: 2 channels × 4 listings × 6 orders
@@ -505,6 +514,452 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
 
     const { data: createdHrSubmissions } = await supabase.from("hr_submissions").insert(hrSubmissionsData).select();
 
+    // ============================================
+    // SEED RECONCILIATION: matches for shipment invoices + marketplace orders
+    // ============================================
+    const reconciliationData: Array<{
+      org_id: string;
+      invoice_source: string;
+      invoice_id: string;
+      invoice_amount: number;
+      expected_amount: number | null;
+      currency: string;
+      status: string;
+      match_type: string | null;
+      flagged_reason: string | null;
+      notes: string | null;
+      matched_by: string;
+      matched_at: string;
+      seed_run_id: string;
+    }> = [];
+
+    // Reconciliation matches for shipment invoices (create 2: 1 matched, 1 flagged)
+    const shipInvList = createdShipmentInvoices || [];
+    if (shipInvList.length >= 1) {
+      reconciliationData.push({
+        org_id: orgId,
+        invoice_source: "shipment",
+        invoice_id: shipInvList[0].id,
+        invoice_amount: Number(shipInvList[0].amount),
+        expected_amount: Number(shipInvList[0].amount),
+        currency: "EUR",
+        status: "matched",
+        match_type: "exact",
+        flagged_reason: null,
+        notes: "Verified against carrier confirmation",
+        matched_by: user.id,
+        matched_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+        seed_run_id: runId,
+      });
+    }
+    if (shipInvList.length >= 2) {
+      const inv = shipInvList[1];
+      const expectedAmt = Number(inv.amount) - 5.0;
+      reconciliationData.push({
+        org_id: orgId,
+        invoice_source: "shipment",
+        invoice_id: inv.id,
+        invoice_amount: Number(inv.amount),
+        expected_amount: expectedAmt,
+        currency: "EUR",
+        status: "flagged",
+        match_type: null,
+        flagged_reason: "Amount mismatch: invoice exceeds agreed rate by €5.00",
+        notes: "Awaiting carrier clarification",
+        matched_by: user.id,
+        matched_at: new Date(Date.now() - 86400000).toISOString(),
+        seed_run_id: runId,
+      });
+    }
+
+    // Reconciliation matches for marketplace orders (create 2: 1 matched, 1 flagged)
+    const orderList = createdOrders || [];
+    if (orderList.length >= 1) {
+      reconciliationData.push({
+        org_id: orgId,
+        invoice_source: "marketplace",
+        invoice_id: orderList[0].id,
+        invoice_amount: Number(orderList[0].total_amount),
+        expected_amount: Number(orderList[0].total_amount),
+        currency: "EUR",
+        status: "matched",
+        match_type: "exact",
+        flagged_reason: null,
+        notes: null,
+        matched_by: user.id,
+        matched_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+        seed_run_id: runId,
+      });
+    }
+    if (orderList.length >= 3) {
+      const order = orderList[2];
+      reconciliationData.push({
+        org_id: orgId,
+        invoice_source: "marketplace",
+        invoice_id: order.id,
+        invoice_amount: Number(order.total_amount),
+        expected_amount: Number(order.total_amount) + 12.5,
+        currency: "EUR",
+        status: "flagged",
+        match_type: null,
+        flagged_reason: "Revenue below expected: possible return not yet processed",
+        notes: null,
+        matched_by: user.id,
+        matched_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+        seed_run_id: runId,
+      });
+    }
+
+    const { data: createdReconciliationMatches } = reconciliationData.length > 0
+      ? await supabase.from("reconciliation_matches").insert(reconciliationData).select()
+      : { data: [] };
+
+    // ============================================
+    // SEED CUSTOMS & EXPORT: 12 declarations + 24 documents + 2 exceptions
+    // ============================================
+    const declarationTemplates = [
+      { declaration_type: "export", status: "draft", origin_country: "DE", destination_country: "US", transport_mode: "air", hs_code: "8471.30", commodity_description: "Laptop computers, portable", quantity: 10, unit_of_measure: "PCS", declared_value_eur: 12500.00, incoterms: "DAP", exporter_name: "Muster GmbH", importer_name: "ACME Corp", customs_office: "Zollamt Frankfurt Flughafen" },
+      { declaration_type: "export", status: "draft", origin_country: "DE", destination_country: "GB", transport_mode: "road", hs_code: "3004.90", commodity_description: "Medicinal products, mixed", quantity: 200, unit_of_measure: "KGM", declared_value_eur: 8750.00, incoterms: "DDP", exporter_name: "Pharma GmbH", importer_name: "UK Healthcare Ltd", customs_office: "Zollamt Aachen" },
+      { declaration_type: "import", status: "draft", origin_country: "CN", destination_country: "DE", transport_mode: "sea", hs_code: "6204.62", commodity_description: "Women's trousers, cotton", quantity: 500, unit_of_measure: "PCS", declared_value_eur: 4200.00, incoterms: "CIF", exporter_name: "Shenzhen Fashion Co", importer_name: "Mode GmbH", customs_office: "Zollamt Hamburg Hafen" },
+      { declaration_type: "export", status: "submitted", origin_country: "DE", destination_country: "JP", transport_mode: "air", hs_code: "9022.19", commodity_description: "X-ray apparatus, medical", quantity: 2, unit_of_measure: "PCS", declared_value_eur: 95000.00, incoterms: "CIP", exporter_name: "Medical Tech AG", importer_name: "Tokyo Health KK", customs_office: "Zollamt München Flughafen" },
+      { declaration_type: "export", status: "submitted", origin_country: "DE", destination_country: "AU", transport_mode: "sea", hs_code: "8703.23", commodity_description: "Motor vehicles, cylinder 1500-3000cc", quantity: 5, unit_of_measure: "PCS", declared_value_eur: 187500.00, incoterms: "FOB", exporter_name: "Auto Export AG", importer_name: "Sydney Motors Pty", customs_office: "Zollamt Bremerhaven" },
+      { declaration_type: "import", status: "submitted", origin_country: "TR", destination_country: "DE", transport_mode: "road", hs_code: "0805.10", commodity_description: "Oranges, fresh", quantity: 20000, unit_of_measure: "KGM", declared_value_eur: 14000.00, incoterms: "EXW", exporter_name: "Antalya Fresh Ltd", importer_name: "Früchte Import GmbH", customs_office: "Zollamt Kehl" },
+      { declaration_type: "transit", status: "under_review", origin_country: "CH", destination_country: "PL", transport_mode: "road", hs_code: "2710.19", commodity_description: "Petroleum oils, not crude", quantity: 50000, unit_of_measure: "LTR", declared_value_eur: 62500.00, incoterms: "CPT", exporter_name: "Swiss Petro AG", importer_name: "Polska Oil Sp.", customs_office: "Zollamt Lörrach" },
+      { declaration_type: "export", status: "under_review", origin_country: "DE", destination_country: "IN", transport_mode: "sea", hs_code: "8408.90", commodity_description: "Compression-ignition engines", quantity: 50, unit_of_measure: "PCS", declared_value_eur: 145000.00, incoterms: "CFR", exporter_name: "Maschinenbau GmbH", importer_name: "Bharat Machinery Ltd", customs_office: "Zollamt Hamburg Hafen" },
+      { declaration_type: "export", status: "cleared", origin_country: "DE", destination_country: "US", transport_mode: "air", hs_code: "9021.10", commodity_description: "Orthopaedic implants", quantity: 100, unit_of_measure: "PCS", declared_value_eur: 78000.00, incoterms: "DAP", exporter_name: "MedDevice GmbH", importer_name: "MedSupply Inc", customs_office: "Zollamt Frankfurt Flughafen" },
+      { declaration_type: "import", status: "cleared", origin_country: "KR", destination_country: "DE", transport_mode: "sea", hs_code: "8542.31", commodity_description: "Electronic integrated circuits, processors", quantity: 10000, unit_of_measure: "PCS", declared_value_eur: 55000.00, incoterms: "CIF", exporter_name: "Samsung Electronics", importer_name: "Chip Import AG", customs_office: "Zollamt Hamburg Hafen" },
+      { declaration_type: "export", status: "exception", origin_country: "DE", destination_country: "RU", transport_mode: "road", hs_code: "8542.32", commodity_description: "Dual-use electronic components", quantity: 500, unit_of_measure: "PCS", declared_value_eur: 42000.00, incoterms: "DAP", exporter_name: "Tech Export GmbH", importer_name: "Moskovskiy Tech", customs_office: "Zollamt Frankfurt (Oder)", notes: "Requires export license verification" },
+      { declaration_type: "import", status: "exception", origin_country: "BR", destination_country: "DE", transport_mode: "sea", hs_code: "0901.11", commodity_description: "Coffee, not roasted, not decaffeinated", quantity: 5000, unit_of_measure: "KGM", declared_value_eur: 18500.00, incoterms: "CIF", exporter_name: "Fazenda Brasil SA", importer_name: "Kaffee Import GmbH", customs_office: "Zollamt Hamburg Hafen", notes: "Phytosanitary certificate missing" },
+    ] as const;
+
+    const customsDeclarationsData = declarationTemplates.map((tmpl) => ({
+      org_id: orgId,
+      created_by: user.id,
+      seed_run_id: runId,
+      ...tmpl,
+    }));
+
+    const { data: createdCustomsDeclarations } = await supabase
+      .from("customs_declarations")
+      .insert(customsDeclarationsData)
+      .select();
+
+    // Seed 2 documents per declaration (commercial_invoice + packing_list)
+    const customsDocumentsData: any[] = [];
+    const customsStoragePaths: string[] = [];
+
+    for (const decl of createdCustomsDeclarations || []) {
+      for (const docType of ["commercial_invoice", "packing_list"] as const) {
+        const pdfContent = generateFakePDFContent();
+        const path = `${orgId}/customs/${decl.id}/${crypto.randomUUID()}.pdf`;
+        const { error: uploadErr } = await supabase.storage
+          .from("documents")
+          .upload(path, pdfContent, { contentType: "application/pdf" });
+        if (!uploadErr) {
+          customsStoragePaths.push(path);
+          customsDocumentsData.push({
+            org_id: orgId,
+            declaration_id: decl.id,
+            document_type: docType,
+            filename: `${docType.replace(/_/g, "-")}-${decl.reference_number}.pdf`,
+            storage_path: path,
+            uploaded_by: user.id,
+            seed_run_id: runId,
+          });
+        }
+      }
+    }
+
+    const { data: createdCustomsDocuments } = customsDocumentsData.length > 0
+      ? await supabase.from("customs_documents").insert(customsDocumentsData).select()
+      : { data: [] };
+
+    // Seed 1 exception per declaration with exception status
+    const exceptionDeclarations = (createdCustomsDeclarations || []).filter(
+      (d: { status: string }) => d.status === "exception"
+    );
+    const customsExceptionsData = exceptionDeclarations.map((decl: { id: string }, idx: number) => ({
+      org_id: orgId,
+      declaration_id: decl.id,
+      exception_code: idx === 0 ? "EXP-LIC-001" : "PHY-CERT-002",
+      description: idx === 0
+        ? "Export license required for dual-use goods under EC regulation 2021/821"
+        : "Phytosanitary certificate missing — required for plant product imports",
+      severity: idx === 0 ? "high" : "medium",
+      status: "open",
+      seed_run_id: runId,
+    }));
+
+    const { data: createdCustomsExceptions } = customsExceptionsData.length > 0
+      ? await supabase.from("customs_exceptions").insert(customsExceptionsData).select()
+      : { data: [] };
+
+    // ============================================
+    // SEED TENDER DESK: 5 companies + 8 tenders + 12 submissions
+    // ============================================
+    const companiesData = [
+      {
+        org_id: orgId,
+        name: "Müller GmbH",
+        legal_form: "GmbH",
+        vat_id: "DE123456789",
+        tax_number: "123/456/7890",
+        street: "Industriestraße 15",
+        postcode: "10115",
+        city: "Berlin",
+        state: "BE",
+        country: "DE",
+        phone: "+49 30 12345678",
+        email: "info@mueller-gmbh.de",
+        website: "www.mueller-gmbh.de",
+        registration_court: "Amtsgericht Berlin",
+        hrb_number: "HRB 123456",
+        is_buyer: true,
+        is_supplier: true,
+        seed_run_id: runId,
+      },
+      {
+        org_id: orgId,
+        name: "Schmidt & Co. KG",
+        legal_form: "KG",
+        vat_id: "DE987654321",
+        tax_number: "987/654/3210",
+        street: "Hafenstraße 42",
+        postcode: "20095",
+        city: "Hamburg",
+        state: "HH",
+        country: "DE",
+        phone: "+49 40 98765432",
+        email: "kontakt@schmidt-kg.de",
+        website: "www.schmidt-kg.de",
+        registration_court: "Amtsgericht Hamburg",
+        hrb_number: "HRA 654321",
+        is_buyer: false,
+        is_supplier: true,
+        seed_run_id: runId,
+      },
+      {
+        org_id: orgId,
+        name: "Bauer AG",
+        legal_form: "AG",
+        vat_id: "DE456789123",
+        tax_number: "456/789/1234",
+        street: "Maximilianstraße 88",
+        postcode: "80331",
+        city: "München",
+        state: "BY",
+        country: "DE",
+        phone: "+49 89 45678901",
+        email: "investor@bauer-ag.de",
+        website: "www.bauer-ag.de",
+        registration_court: "Amtsgericht München",
+        hrb_number: "HRB 789012",
+        is_buyer: true,
+        is_supplier: false,
+        seed_run_id: runId,
+      },
+      {
+        org_id: orgId,
+        name: "Weber Solutions GmbH",
+        legal_form: "GmbH",
+        vat_id: "DE789123456",
+        tax_number: "789/123/4567",
+        street: "Kaiserstraße 25",
+        postcode: "60311",
+        city: "Frankfurt",
+        state: "HE",
+        country: "DE",
+        phone: "+49 69 78912345",
+        email: "info@weber-solutions.de",
+        website: "www.weber-solutions.de",
+        registration_court: "Amtsgericht Frankfurt",
+        hrb_number: "HRB 345678",
+        is_buyer: false,
+        is_supplier: true,
+        seed_run_id: runId,
+      },
+      {
+        org_id: orgId,
+        name: "Hoffmann Industries AG",
+        legal_form: "AG",
+        vat_id: "DE321654987",
+        tax_number: "321/654/9876",
+        street: "Rheinstraße 100",
+        postcode: "40213",
+        city: "Düsseldorf",
+        state: "NW",
+        country: "DE",
+        phone: "+49 211 32165498",
+        email: "geschaeftsfuehrung@hoffmann-industries.de",
+        website: "www.hoffmann-industries.de",
+        registration_court: "Amtsgericht Düsseldorf",
+        hrb_number: "HRB 567890",
+        is_buyer: true,
+        is_supplier: false,
+        seed_run_id: runId,
+      },
+    ];
+
+    const { data: createdCompanies } = await supabase.from("companies").insert(companiesData).select();
+
+    // Create tenders (8 tenders with various statuses)
+    const tenderStatuses = ["published", "open", "open", "closing_soon", "closed", "closed", "awarded", "cancelled"] as const;
+    const tenderTypes = ["open", "open", "restricted", "open", "negotiated", "open", "restricted", "open"] as const;
+    const cpvCodes = [
+      ["45233141-5"], // Construction work for buildings
+      ["30125100-9"], // IT software
+      ["33141000-0"], // Medical equipment
+      ["45233220-7"], // Road construction
+      ["30120000-6"], // Computer equipment
+      ["33110000-5"], // Laboratory equipment
+      ["45234100-8"], // Building installation work
+      ["30192110-4"], // Office software
+    ];
+    const tenderTitles = [
+      "Neubau Verwaltungsgebäude - Bauleistungen",
+      "Softwarelizenzierung und Wartung ERP-System",
+      "Medizinische Geräte für Klinikum",
+      "Straßensanierung Hauptstraße - Abschnitt A",
+      "IT-Hardware Beschaffung Workstations",
+      "Laborausstattung Forschungszentrum",
+      "HVAC-Installation Neubau Produktionshalle",
+      "Bürosoftware Suite - Lizenzverlängerung",
+    ];
+    const estimatedValues = [450000, 85000, 125000, 280000, 45000, 95000, 175000, 25000];
+
+    const tendersData = (createdCompanies || []).filter(c => c.is_buyer).flatMap((buyer, buyerIdx) => {
+      const buyerTenders = [];
+      for (let i = 0; i < (buyerIdx === 0 ? 3 : 2); i++) {
+        const idx = buyerIdx * 2 + i;
+        if (idx >= 8) break;
+        const daysOffset = idx * 5;
+        buyerTenders.push({
+          org_id: orgId,
+          buyer_company_id: buyer.id,
+          tender_id: `TD-2024-${String(1000 + idx).padStart(4, "0")}`,
+          title: tenderTitles[idx],
+          description: `Ausschreibung für ${tenderTitles[idx].toLowerCase()}. Alle Details in den Anlagen.`,
+          cpv_codes: cpvCodes[idx],
+          tender_type: tenderTypes[idx],
+          estimated_value: estimatedValues[idx],
+          currency: "EUR",
+          publish_date: new Date(Date.now() - (20 + daysOffset) * 86400000).toISOString().split("T")[0],
+          deadline_date: new Date(Date.now() + (30 - daysOffset) * 86400000).toISOString().split("T")[0],
+          award_date: tenderStatuses[idx] === "awarded" ? new Date(Date.now() - 5 * 86400000).toISOString().split("T")[0] : null,
+          status: tenderStatuses[idx],
+          contact_name: `Herr ${["Müller", "Schmidt", "Bauer", "Weber", "Hoffmann"][idx % 5]}`,
+          contact_email: `ausschreibung${idx + 1}@${buyer.name.toLowerCase().replace(/[^a-z]/g, "")}.de`,
+          contact_phone: buyer.phone,
+          document_count: 3,
+          seed_run_id: runId,
+        });
+      }
+      return buyerTenders;
+    });
+
+    const { data: createdTenders } = await supabase.from("tenders").insert(tendersData).select();
+
+    // Create submissions (12 submissions)
+    const submissionStatuses = ["draft", "submitted", "submitted", "under_review", "under_review", "accepted", "accepted", "rejected", "rejected", "draft", "submitted", "under_review"] as const;
+    const supplierCompanies = (createdCompanies || []).filter(c => c.is_supplier);
+    
+    const submissionsData: any[] = [];
+    let submissionIdx = 0;
+    
+    for (const tender of (createdTenders || []).filter(t => t.status !== "cancelled" && t.status !== "published")) {
+      for (let i = 0; i < (tender.status === "awarded" ? 3 : 2); i++) {
+        if (submissionIdx >= 12) break;
+        const supplier = supplierCompanies[submissionIdx % supplierCompanies.length];
+        const bidAmount = tender.estimated_value * (0.85 + Math.random() * 0.25); // 85-110% of estimated value
+        
+        submissionsData.push({
+          org_id: orgId,
+          tender_id: tender.id,
+          supplier_company_id: supplier.id,
+          submission_reference: submissionStatuses[submissionIdx] !== "draft" ? `BID-2024-${String(1000 + submissionIdx).padStart(4, "0")}` : null,
+          bid_amount: Math.round(bidAmount * 100) / 100,
+          currency: "EUR",
+          status: submissionStatuses[submissionIdx],
+          technical_proposal: `Technisches Konzept für ${tender.title}. Umfassende Lösung mit garantierter Qualität.`,
+          financial_proposal: `Finanzierungsvorschlag: ${Math.round(bidAmount * 100) / 100} EUR inkl. aller Nebenkosten.`,
+          submitted_at: submissionStatuses[submissionIdx] !== "draft" ? new Date(Date.now() - (submissionIdx + 1) * 2 * 86400000).toISOString() : null,
+          seed_run_id: runId,
+        });
+        submissionIdx++;
+      }
+    }
+
+    const { data: createdSubmissions } = await supabase.from("tender_submissions").insert(submissionsData).select();
+
+    // ============================================
+    // SEED TAX & DISCLOSURE: 6 filings + 4 disclosures
+    // ============================================
+    const taxFilingTypes = ["USt-Voranmeldung", "USt-Erklärung", "Gewerbesteuer", "Körperschaftsteuer", "USt-Voranmeldung", "Gewerbesteuer"] as const;
+    const filingStatuses = ["draft", "submitted", "accepted", "rejected", "correction_needed", "submitted"] as const;
+    const filingPeriods = ["03/2024", "2023-Q4", "2023", "2023", "02/2024", "2023"];
+    const revenues = [125000, 450000, 890000, 1200000, 98000, 750000];
+    const vatAmounts = [23750, 85500, null, null, 18620, null];
+    const taxPayables = [null, null, 45000, 85000, null, 38000];
+
+    const taxFilingsData = (createdCompanies || []).slice(0, 3).flatMap((company, idx) => {
+      const filings = [];
+      for (let i = 0; i < 2; i++) {
+        const filingIdx = idx * 2 + i;
+        if (filingIdx >= 6) break;
+        filings.push({
+          org_id: orgId,
+          company_id: company.id,
+          filing_reference: `${taxFilingTypes[filingIdx].split("-")[0] || taxFilingTypes[filingIdx].substring(0, 3)}-2024-${String(100 + filingIdx).padStart(3, "0")}`,
+          filing_type: taxFilingTypes[filingIdx],
+          filing_period: filingPeriods[filingIdx],
+          period_start: filingPeriods[filingIdx].includes("/") 
+            ? `2024-${filingPeriods[filingIdx].split("/")[0]}-01`
+            : `${filingPeriods[filingIdx].split("-")[0]}-01-01`,
+          period_end: filingPeriods[filingIdx].includes("/")
+            ? `2024-${filingPeriods[filingIdx].split("/")[0]}-31`
+            : `${filingPeriods[filingIdx].split("-")[0]}-12-31`,
+          revenue: revenues[filingIdx],
+          vat_amount: vatAmounts[filingIdx],
+          tax_payable: taxPayables[filingIdx],
+          status: filingStatuses[filingIdx],
+          elster_tax_number: company.tax_number,
+          certificate_id: filingStatuses[filingIdx] !== "draft" ? `CERT-${company.vat_id}-2024` : null,
+          submitted_at: filingStatuses[filingIdx] !== "draft" ? new Date(Date.now() - (filingIdx + 1) * 5 * 86400000).toISOString() : null,
+          due_date: new Date(Date.now() + (30 + filingIdx * 10) * 86400000).toISOString().split("T")[0],
+          seed_run_id: runId,
+        });
+      }
+      return filings;
+    });
+
+    const { data: createdTaxFilings } = await supabase.from("tax_filings").insert(taxFilingsData).select();
+
+    // Create disclosures (4 disclosures)
+    const disclosureTypes = ["annual_financial_statements", "change_notification", "annual_financial_statements", "change_notification"] as const;
+    const disclosureStatuses = ["published", "submitted", "draft", "rejected"] as const;
+    const disclosureTitles = [
+      "Jahresabschluss 2023 Müller GmbH",
+      "Änderung Geschäftsführung Bauer AG",
+      "Jahresabschluss 2023 Weber Solutions GmbH",
+      "Nachtrag zur Satzung Hoffmann Industries",
+    ];
+
+    const disclosuresData = (createdCompanies || []).slice(0, 4).map((company, idx) => ({
+      org_id: orgId,
+      company_id: company.id,
+      disclosure_reference: `${disclosureTypes[idx] === "annual_financial_statements" ? "HB" : "ÄM"}-2024-${String(100 + idx).padStart(3, "0")}`,
+      disclosure_type: disclosureTypes[idx],
+      title: disclosureTitles[idx],
+      description: `Offenlegung gemäß HGB für ${company.name}. ${disclosureTypes[idx] === "annual_financial_statements" ? "Jahresabschluss mit Lagebericht." : "Wesentliche Änderung der Unternehmensstruktur."}`,
+      status: disclosureStatuses[idx],
+      publication_date: disclosureStatuses[idx] === "published" ? new Date(Date.now() - idx * 15 * 86400000).toISOString().split("T")[0] : null,
+      bundesanzeiger_id: disclosureStatuses[idx] === "published" ? `BAnz${new Date().getFullYear()}${String(10000 + idx).padStart(5, "0")}` : null,
+      document_count: 2,
+      seed_run_id: runId,
+    }));
+
+    const { data: createdDisclosures } = await supabase.from("disclosures").insert(disclosuresData).select();
+
     // Log audit event
     await supabase.from("audit_events").insert({
       org_id: orgId,
@@ -521,6 +976,15 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
         orders_created: createdOrders?.length || 0,
         employees_created: createdEmployees?.length || 0,
         hr_submissions_created: createdHrSubmissions?.length || 0,
+        companies_created: createdCompanies?.length || 0,
+        tenders_created: createdTenders?.length || 0,
+        submissions_created: createdSubmissions?.length || 0,
+        tax_filings_created: createdTaxFilings?.length || 0,
+        disclosures_created: createdDisclosures?.length || 0,
+        reconciliation_matches_created: createdReconciliationMatches?.length || 0,
+        customs_declarations_created: createdCustomsDeclarations?.length || 0,
+        customs_documents_created: createdCustomsDocuments?.length || 0,
+        customs_exceptions_created: createdCustomsExceptions?.length || 0,
       },
     });
 
@@ -538,7 +1002,16 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
           (createdListings?.length || 0) +
           (createdOrders?.length || 0) +
           (createdEmployees?.length || 0) +
-          (createdHrSubmissions?.length || 0),
+          (createdHrSubmissions?.length || 0) +
+          (createdCompanies?.length || 0) +
+          (createdTenders?.length || 0) +
+          (createdSubmissions?.length || 0) +
+          (createdTaxFilings?.length || 0) +
+          (createdDisclosures?.length || 0) +
+          (createdReconciliationMatches?.length || 0) +
+          (createdCustomsDeclarations?.length || 0) +
+          (createdCustomsDocuments?.length || 0) +
+          (createdCustomsExceptions?.length || 0),
       })
       .eq("id", runId);
 
@@ -555,6 +1028,15 @@ export async function seedScenario(orgId: string): Promise<SeedResult> {
       ordersCreated: createdOrders?.length || 0,
       employeesCreated: createdEmployees?.length || 0,
       hrSubmissionsCreated: createdHrSubmissions?.length || 0,
+      companiesCreated: createdCompanies?.length || 0,
+      tendersCreated: createdTenders?.length || 0,
+      submissionsCreated: createdSubmissions?.length || 0,
+      taxFilingsCreated: createdTaxFilings?.length || 0,
+      disclosuresCreated: createdDisclosures?.length || 0,
+      reconciliationMatchesCreated: createdReconciliationMatches?.length || 0,
+      customsDeclarationsCreated: createdCustomsDeclarations?.length || 0,
+      customsDocumentsCreated: createdCustomsDocuments?.length || 0,
+      customsExceptionsCreated: createdCustomsExceptions?.length || 0,
     };
   } catch (error) {
     // Update scenario run to failed
@@ -626,12 +1108,38 @@ export async function resetScenario(runId: string): Promise<void> {
   await supabase.from("document_versions").delete().eq("seed_run_id", runId);
   await supabase.from("documents").delete().eq("seed_run_id", runId);
   await supabase.from("cases").delete().eq("seed_run_id", runId);
-  // Portal module tables
+  // Portal module tables - Tender Desk (delete children first)
+  await supabase.from("tender_documents").delete().eq("seed_run_id", runId);
+  await supabase.from("tender_submissions").delete().eq("seed_run_id", runId);
+  await supabase.from("tenders").delete().eq("seed_run_id", runId);
+  // Portal module tables - Tax & Disclosure (delete children first)
+  await supabase.from("tax_filing_documents").delete().eq("seed_run_id", runId);
+  await supabase.from("tax_filings").delete().eq("seed_run_id", runId);
+  await supabase.from("disclosure_documents").delete().eq("seed_run_id", runId);
+  await supabase.from("disclosures").delete().eq("seed_run_id", runId);
+  // Companies (shared across Tender and Tax modules)
+  await supabase.from("companies").delete().eq("seed_run_id", runId);
+  // Portal module tables - HR
   await supabase.from("hr_submissions").delete().eq("seed_run_id", runId);
   await supabase.from("employees").delete().eq("seed_run_id", runId);
+  // Portal module tables - Marketplace
   await supabase.from("marketplace_reports").delete().eq("seed_run_id", runId);
   await supabase.from("marketplace_orders").delete().eq("seed_run_id", runId);
   await supabase.from("marketplace_listings").delete().eq("seed_run_id", runId);
+  // Portal module tables - Reconciliation
+  await supabase.from("reconciliation_matches").delete().eq("seed_run_id", runId);
+  // Portal module tables - Customs (storage cleanup + FK order)
+  const { data: custDocs } = await supabase
+    .from("customs_documents")
+    .select("storage_path")
+    .eq("seed_run_id", runId);
+  if (custDocs && custDocs.length > 0) {
+    await supabase.storage.from("documents").remove(custDocs.map((d: { storage_path: string }) => d.storage_path));
+  }
+  await supabase.from("customs_exceptions").delete().eq("seed_run_id", runId);
+  await supabase.from("customs_documents").delete().eq("seed_run_id", runId);
+  await supabase.from("customs_declarations").delete().eq("seed_run_id", runId);
+  // Portal module tables - Logistics
   await supabase.from("shipment_invoices").delete().eq("seed_run_id", runId);
   await supabase.from("shipments").delete().eq("seed_run_id", runId);
   await supabase.from("scenario_runs").delete().eq("id", runId);

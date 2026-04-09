@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Portal Gym - Auth and Navigation", () => {
   test("sign-in page renders", async ({ page }) => {
-    await page.goto("/auth/sign-in");
-    await expect(page.locator("text=Sign In")).toBeVisible();
+    await page.goto("/sign-in");
+    await expect(page.locator('[data-slot="card-title"]:has-text("Sign In")').first()).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
   });

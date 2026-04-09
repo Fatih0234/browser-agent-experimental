@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "data:setup": "uv sync && uv run python scripts/generate_data.py",
+    "data:generate": "uv run python scripts/generate_data.py",
+    "data:seed": "uv run python scripts/seed.py --org-id cf7c9172-46f4-4f2e-8c49-5c3d85c8a606 --user-id 6726d83c-947f-4e62-a6c1-60d12cf00ce9",
+    "data:check": "uv run python scripts/check_db.py",
+    "data:mock": "cd test-data/mock-server && npm install && npm start",
+    "dev:full": "npm run data:seed && npm run dev"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

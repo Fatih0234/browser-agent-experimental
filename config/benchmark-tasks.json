@@ -1,5 +1,5 @@
 {
-  "benchmark_version": "2.0.0",
+  "benchmark_version": "2.3.0",
   "benchmark_name": "Portal Gym V1",
   "description": "Browser agent capability assessment for multi-tenant SaaS application",
   "base_url": "http://localhost:3001",
@@ -948,6 +948,420 @@
       ],
       "pass_criteria": ["Filter applied successfully", "Only Kurzarbeit submissions visible", "Count captured"],
       "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-029",
+      "name": "Navigate to Reconciliation Dashboard",
+      "category": "reconciliation",
+      "critical": false,
+      "depends_on": ["task-001"],
+      "description": "Navigate to the reconciliation module and verify the dashboard loads with summary stats",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org", "expected_state": "Dashboard loaded" },
+        { "order": 2, "action": "click", "target": "a[href*='/reconciliation']", "expected_state": "Reconciliation nav link clicked" },
+        { "order": 3, "action": "verify", "assertions": ["URL contains /reconciliation", "Summary cards visible (Pending, Matched, Flagged, Total)", "Recent Invoices section present"] }
+      ],
+      "pass_criteria": ["Reconciliation page reached via nav", "Summary cards rendered", "No JS errors"],
+      "scoring": { "time_weight": 0.7, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-030",
+      "name": "Find a Flagged Invoice",
+      "category": "reconciliation",
+      "critical": false,
+      "depends_on": ["task-008", "task-029"],
+      "description": "After seeding, navigate to Reconciliation, filter invoices by 'flagged' status, and open the first flagged invoice",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/reconciliation/invoices", "expected_state": "Invoice list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "flagged", "expected_state": "Flagged filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["At least one flagged invoice visible", "Badges show 'flagged'"] },
+        { "order": 4, "action": "click", "target": "table tbody tr:first-child td:first-child a", "expected_state": "Invoice detail opened" },
+        { "order": 5, "action": "verify", "assertions": ["Invoice detail page loaded", "Status badge shows 'flagged'", "Flagged reason visible"] }
+      ],
+      "pass_criteria": ["Filter applied", "Flagged invoice found", "Detail page opens with reason"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.15, "max_retries": 3 }
+    },
+    {
+      "id": "task-031",
+      "name": "Match an Invoice to an Expected Amount",
+      "category": "reconciliation",
+      "critical": false,
+      "depends_on": ["task-008", "task-029"],
+      "description": "Find a pending invoice, fill the expected amount, select match type 'exact', and confirm the match",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/reconciliation/invoices", "expected_state": "Invoice list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "pending", "expected_state": "Pending filter applied" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child td:first-child a", "expected_state": "Invoice detail opened" },
+        { "order": 4, "action": "fill", "target": "#expected-amount", "value": "{invoice_amount}", "expected_state": "Expected amount filled" },
+        { "order": 5, "action": "select", "target": "#match-type", "value": "exact", "expected_state": "Match type selected" },
+        { "order": 6, "action": "click", "target": "#match-invoice-btn", "expected_state": "Match submitted" },
+        { "order": 7, "action": "verify", "assertions": ["Status badge changes to 'matched'", "Toast success message visible"] }
+      ],
+      "pass_criteria": ["Form filled correctly", "Match confirmed", "Status updated to matched"],
+      "scoring": { "time_weight": 0.5, "retry_penalty": 0.15, "max_retries": 3 }
+    },
+    {
+      "id": "task-032",
+      "name": "Flag a Discrepancy with a Reason",
+      "category": "reconciliation",
+      "critical": false,
+      "depends_on": ["task-008", "task-029"],
+      "description": "Find a pending invoice and flag it with reason 'Duplicate invoice detected'",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/reconciliation/invoices", "expected_state": "Invoice list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "pending", "expected_state": "Pending filter applied" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child td:first-child a", "expected_state": "Invoice detail opened" },
+        { "order": 4, "action": "fill", "target": "#flag-reason", "value": "Duplicate invoice detected", "expected_state": "Flag reason filled" },
+        { "order": 5, "action": "click", "target": "#flag-invoice-btn", "expected_state": "Flag submitted" },
+        { "order": 6, "action": "verify", "assertions": ["Status badge shows 'flagged'", "Toast success message visible"] }
+      ],
+      "pass_criteria": ["Reason entered", "Flag action confirmed", "Invoice status updated to flagged"],
+      "scoring": { "time_weight": 0.5, "retry_penalty": 0.15, "max_retries": 3 }
+    },
+    {
+      "id": "task-033",
+      "name": "View Reconciliation Report and Export CSV",
+      "category": "reconciliation",
+      "critical": false,
+      "depends_on": ["task-008", "task-029"],
+      "description": "Navigate to the Reconciliation Reports page and trigger the CSV export",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/reconciliation/reports", "expected_state": "Reports page loaded" },
+        { "order": 2, "action": "verify", "assertions": ["Carrier breakdown table visible", "Marketplace breakdown table visible", "Match rate percentages shown"] },
+        { "order": 3, "action": "click", "target": "#export-csv-btn", "expected_state": "CSV export triggered" },
+        { "order": 4, "action": "verify", "assertions": ["Toast success message 'CSV exported' visible", "No error toasts"] }
+      ],
+      "pass_criteria": ["Reports page renders with data", "CSV export completes without error"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-034",
+      "name": "Navigate to Tender Desk",
+      "category": "tender",
+      "critical": false,
+      "depends_on": ["task-001"],
+      "description": "Navigate to the Tender Desk portal and verify the tender list loads",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tenders", "expected_state": "Tender Desk page loaded" },
+        { "order": 2, "action": "verify", "assertions": [
+          "Heading 'Tender Desk' visible",
+          "Tenders table present",
+          "'New Tender' button visible",
+          "Status filter and Type filter present"
+        ]}
+      ],
+      "pass_criteria": ["Tender Desk page loads", "Table with tenders rendered", "Filter controls visible"],
+      "scoring": { "time_weight": 0.5, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-035",
+      "name": "Filter Tenders by Status Open and Count",
+      "category": "tender",
+      "critical": false,
+      "depends_on": ["task-008", "task-034"],
+      "description": "Apply status filter 'open' on the Tender Desk and capture the total count of open tenders",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tenders", "expected_state": "Tender Desk loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "open", "expected_state": "Open filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["All visible rows have 'open' status badge", "Card header shows Tenders count"] },
+        { "order": 4, "action": "capture_state", "key": "open_tender_count", "selector": "text=/Tenders \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Status filter set to open", "Only open tenders visible", "Count captured from table header"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-036",
+      "name": "Find Tenders Closing Soon",
+      "category": "tender",
+      "critical": false,
+      "depends_on": ["task-008", "task-034"],
+      "description": "Filter tenders by status 'closing_soon' and verify at least one result with a highlighted deadline",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tenders", "expected_state": "Tender Desk loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "closing_soon", "expected_state": "Closing Soon filter applied" },
+        { "order": 3, "action": "verify", "assertions": [
+          "At least one row with 'closing soon' badge visible",
+          "Deadline column shows a date with days-remaining indicator"
+        ]},
+        { "order": 4, "action": "capture_state", "key": "closing_soon_count", "selector": "text=/Tenders \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Filter applied", "Closing soon tenders visible with deadline urgency indicator"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-037",
+      "name": "Filter Tenders by Type Restricted",
+      "category": "tender",
+      "critical": false,
+      "depends_on": ["task-008", "task-034"],
+      "description": "Apply both status filter 'all' and type filter 'restricted', then count the results",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tenders", "expected_state": "Tender Desk loaded" },
+        { "order": 2, "action": "select", "target": "#type-filter", "value": "restricted", "expected_state": "Restricted type filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["All visible rows have 'restricted' type badge", "Count > 0 in table header"] },
+        { "order": 4, "action": "capture_state", "key": "restricted_count", "selector": "text=/Tenders \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Type filter set to restricted", "Only restricted-type tenders visible", "Count captured"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-038",
+      "name": "Open Tender Detail and Read Estimated Value",
+      "category": "tender",
+      "critical": false,
+      "depends_on": ["task-008", "task-034"],
+      "description": "Open the first tender in the list, navigate to its detail page, and record the estimated value shown",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tenders", "expected_state": "Tender list loaded" },
+        { "order": 2, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Tender detail page opened" },
+        { "order": 3, "action": "verify", "assertions": [
+          "URL matches /demo-org/tenders/.*",
+          "Tender title heading visible",
+          "Estimated value shown (€ amount or '—')",
+          "Status badge visible",
+          "Buyer company name shown"
+        ]},
+        { "order": 4, "action": "capture_state", "key": "estimated_value", "selector": "text=/€[\\d,]+|Estimated Value/", "pattern": ".*" }
+      ],
+      "pass_criteria": ["Tender detail page loads", "Estimated value field visible", "Buyer info rendered"],
+      "scoring": { "time_weight": 0.7, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-039",
+      "name": "Navigate to Tender Submissions List",
+      "category": "tender",
+      "critical": false,
+      "depends_on": ["task-008", "task-034"],
+      "description": "From the Tender Desk, follow the 'View all submissions' link and verify the submissions list loads",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tenders", "expected_state": "Tender Desk loaded" },
+        { "order": 2, "action": "click", "target": "a:has-text('View all submissions')", "expected_state": "Navigated to submissions page" },
+        { "order": 3, "action": "verify", "assertions": [
+          "URL contains /tender-submissions",
+          "Submissions table visible",
+          "Status filter present"
+        ]},
+        { "order": 4, "action": "capture_state", "key": "submission_count", "selector": "text=/Submissions \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Submissions list page reached", "Table renders with data", "Count captured"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-040",
+      "name": "Navigate to Tax and Disclosure Dashboard",
+      "category": "tax",
+      "critical": false,
+      "depends_on": ["task-001"],
+      "description": "Navigate to the Tax & Disclosure portal and verify the dashboard renders with summary cards",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tax", "expected_state": "Tax dashboard loaded" },
+        { "order": 2, "action": "verify", "assertions": [
+          "Heading 'Tax & Disclosure' visible",
+          "Summary card 'Tax Filings' present",
+          "Summary card 'Disclosures' present",
+          "Summary card 'Upcoming Deadlines' present"
+        ]}
+      ],
+      "pass_criteria": ["Tax dashboard page loads", "All 3 summary cards rendered"],
+      "scoring": { "time_weight": 0.5, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-041",
+      "name": "Read Upcoming Deadline Count from Tax Dashboard",
+      "category": "tax",
+      "critical": false,
+      "depends_on": ["task-008", "task-040"],
+      "description": "Read the number in the 'Upcoming Deadlines' summary card on the Tax dashboard",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tax", "expected_state": "Tax dashboard loaded" },
+        { "order": 2, "action": "verify", "assertions": ["'Upcoming Deadlines' card shows a number", "'Due within 30 days' label visible below the count"] },
+        { "order": 3, "action": "capture_state", "key": "upcoming_deadline_count", "selector": "text=/Due within 30 days/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Dashboard loaded", "Upcoming Deadlines count read successfully"],
+      "scoring": { "time_weight": 0.5, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-042",
+      "name": "Filter Tax Filings by Draft Status",
+      "category": "tax",
+      "critical": false,
+      "depends_on": ["task-008", "task-040"],
+      "description": "Navigate to the Tax Filings list, apply status filter 'draft', and count the results",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tax/filings", "expected_state": "Tax Filings list loaded" },
+        { "order": 2, "action": "verify", "assertions": ["Heading 'Tax Filings' visible", "Table with Reference, Type, Period, Status columns present"] },
+        { "order": 3, "action": "select", "target": "#status-filter", "value": "draft", "expected_state": "Draft filter applied" },
+        { "order": 4, "action": "verify", "assertions": ["All visible rows show 'draft' status badge", "Count in header > 0"] },
+        { "order": 5, "action": "capture_state", "key": "draft_filings_count", "selector": "text=/Tax Filings \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Filings list loads", "Draft filter applied", "Only draft filings visible", "Count captured"],
+      "scoring": { "time_weight": 0.7, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-043",
+      "name": "Open Tax Filing Detail and Read Filing Reference",
+      "category": "tax",
+      "critical": false,
+      "depends_on": ["task-008", "task-042"],
+      "description": "From the Tax Filings list, open the first filing and capture its filing reference number",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tax/filings", "expected_state": "Tax Filings list loaded" },
+        { "order": 2, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Filing detail page opened" },
+        { "order": 3, "action": "verify", "assertions": [
+          "URL matches /demo-org/tax/filings/.*",
+          "Filing reference visible (format like ELG-XXXX or similar)",
+          "Filing type shown",
+          "Due date shown",
+          "Status badge visible"
+        ]},
+        { "order": 4, "action": "capture_state", "key": "filing_reference", "selector": "text=/[A-Z]+-\\d+|Filing Reference/", "pattern": ".*" }
+      ],
+      "pass_criteria": ["Filing detail page loads", "Filing reference captured", "Status and due date visible"],
+      "scoring": { "time_weight": 0.7, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-044",
+      "name": "Navigate to Disclosures List",
+      "category": "tax",
+      "critical": false,
+      "depends_on": ["task-008", "task-040"],
+      "description": "From the Tax dashboard, navigate to the Disclosures subpage and verify the list loads",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tax", "expected_state": "Tax dashboard loaded" },
+        { "order": 2, "action": "click", "target": "a:has-text('View All'):near(:text('Recent Disclosures'))", "expected_state": "Navigated to disclosures list" },
+        { "order": 3, "action": "verify", "assertions": [
+          "URL contains /tax/disclosures",
+          "Heading 'Disclosures' or 'Company Disclosures' visible",
+          "Table with Reference, Title, Status columns present"
+        ]},
+        { "order": 4, "action": "capture_state", "key": "total_disclosures", "selector": "text=/Disclosures \\(\\d+\\)/", "pattern": "\\d+" }
+      ],
+      "pass_criteria": ["Disclosures list page loads", "Table with disclosures visible", "Count captured"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-045",
+      "name": "Find a Published Disclosure",
+      "category": "tax",
+      "critical": false,
+      "depends_on": ["task-008", "task-044"],
+      "description": "Navigate to Disclosures, apply status filter 'published', open the first result, and verify the publication date",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/tax/disclosures", "expected_state": "Disclosures list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "published", "expected_state": "Published filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["At least one disclosure with 'published' badge visible", "Publication date column populated (not '—')"] },
+        { "order": 4, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Disclosure detail opened" },
+        { "order": 5, "action": "verify", "assertions": [
+          "URL matches /demo-org/tax/disclosures/.*",
+          "Status badge shows 'published'",
+          "Publication date visible"
+        ]}
+      ],
+      "pass_criteria": ["Published disclosures found", "Detail page loads", "Publication date confirmed"],
+      "scoring": { "time_weight": 0.7, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-046",
+      "name": "Filter Customs Declarations by Exception Status",
+      "category": "customs",
+      "critical": false,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Navigate to the Customs portal, apply the 'exception' status filter, verify declarations with exception status appear, and open the first result",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/customs", "expected_state": "Customs declarations list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "exception", "expected_state": "Exception filter applied" },
+        { "order": 3, "action": "verify", "assertions": ["At least one declaration with 'exception' badge visible", "Other status badges no longer visible"] },
+        { "order": 4, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Declaration detail page opened" },
+        { "order": 5, "action": "verify", "assertions": ["URL matches /demo-org/customs/.*", "Status badge shows 'exception'"] }
+      ],
+      "pass_criteria": ["Exception declarations found", "Filter applied successfully", "Detail page loads"],
+      "scoring": { "time_weight": 0.7, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-047",
+      "name": "Create New Customs Export Declaration",
+      "category": "customs",
+      "critical": true,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Navigate to the new customs declaration wizard and complete all 4 steps to create an export declaration: select type, fill routing, enter goods details, enter parties, then submit",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/customs/new", "expected_state": "New declaration wizard loaded, step 1 of 4" },
+        { "order": 2, "action": "click", "target": "button:has-text('Export')", "expected_state": "Export type selected, border highlighted" },
+        { "order": 3, "action": "fill", "target": "#origin-country", "value": "DE", "expected_state": "Origin country filled" },
+        { "order": 4, "action": "fill", "target": "#destination-country", "value": "US", "expected_state": "Destination country filled" },
+        { "order": 5, "action": "select", "target": "#transport-mode", "value": "air", "expected_state": "Transport mode set to Air" },
+        { "order": 6, "action": "click", "target": "button:has-text('Continue')", "expected_state": "Step 2 loaded: Goods Details" },
+        { "order": 7, "action": "fill", "target": "#hs-code", "value": "8471.30", "expected_state": "HS code filled" },
+        { "order": 8, "action": "fill", "target": "#commodity-description", "value": "Laptop computers, portable", "expected_state": "Commodity description filled" },
+        { "order": 9, "action": "fill", "target": "#quantity", "value": "5", "expected_state": "Quantity filled" },
+        { "order": 10, "action": "fill", "target": "#unit-of-measure", "value": "PCS", "expected_state": "Unit of measure filled" },
+        { "order": 11, "action": "fill", "target": "#declared-value", "value": "6250", "expected_state": "Declared value filled" },
+        { "order": 12, "action": "select", "target": "#incoterms", "value": "DAP", "expected_state": "Incoterms set to DAP" },
+        { "order": 13, "action": "click", "target": "button:has-text('Continue')", "expected_state": "Step 3 loaded: Parties" },
+        { "order": 14, "action": "fill", "target": "#exporter-name", "value": "Test GmbH Frankfurt", "expected_state": "Exporter name filled" },
+        { "order": 15, "action": "fill", "target": "#importer-name", "value": "ACME Corp New York", "expected_state": "Importer name filled" },
+        { "order": 16, "action": "fill", "target": "#customs-office", "value": "Zollamt Frankfurt Flughafen", "expected_state": "Customs office filled" },
+        { "order": 17, "action": "click", "target": "button:has-text('Continue')", "expected_state": "Step 4 loaded: Review & Submit" },
+        { "order": 18, "action": "verify", "assertions": ["Review shows 'export' type", "Origin DE and destination US visible", "HS code 8471.30 visible"] },
+        { "order": 19, "action": "click", "target": "button:has-text('Submit Declaration')", "expected_state": "Declaration created, redirected to detail page" },
+        { "order": 20, "action": "verify", "assertions": ["URL matches /demo-org/customs/.*", "Reference number ATL- prefix visible", "Status badge shows 'draft'"] }
+      ],
+      "pass_criteria": ["All 4 wizard steps completed", "Declaration created successfully", "Redirected to declaration detail", "Reference number generated"],
+      "scoring": { "time_weight": 1.0, "retry_penalty": 0.15, "max_retries": 3 }
+    },
+    {
+      "id": "task-048",
+      "name": "Upload Supporting Document to Declaration",
+      "category": "customs",
+      "critical": false,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Navigate to a customs declaration with exception status, upload a PDF document using the file upload control, and verify the document appears in the documents list",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/customs", "expected_state": "Customs declarations list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "exception", "expected_state": "Filtered to exception declarations" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Declaration detail loaded" },
+        { "order": 4, "action": "upload_file", "target": "#document-upload", "value": "/tmp/portal-gym-fixtures/test-document.pdf", "expected_state": "File selected for upload" },
+        { "order": 5, "action": "wait", "target": "2000", "expected_state": "Upload processing" },
+        { "order": 6, "action": "verify", "assertions": ["Documents section shows at least 3 entries", "Uploaded file name visible in documents list"] }
+      ],
+      "pass_criteria": ["Declaration detail loaded", "File upload initiated", "Document appears in documents list"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-049",
+      "name": "Update Declaration Status to Under Review",
+      "category": "customs",
+      "critical": false,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Navigate to a submitted customs declaration, change the status to 'under_review' using the status dropdown, and verify the badge updates",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/customs", "expected_state": "Customs declarations list loaded" },
+        { "order": 2, "action": "select", "target": "#status-filter", "value": "submitted", "expected_state": "Filtered to submitted declarations" },
+        { "order": 3, "action": "click", "target": "table tbody tr:first-child a", "expected_state": "Declaration detail loaded, status shows 'submitted'" },
+        { "order": 4, "action": "select", "target": "#status-update", "value": "under_review", "expected_state": "Status update triggered" },
+        { "order": 5, "action": "wait", "target": "1500", "expected_state": "Status update processing" },
+        { "order": 6, "action": "verify", "assertions": ["Status badge now shows 'under review'", "Status dropdown reflects new value"] }
+      ],
+      "pass_criteria": ["Submitted declaration found", "Status updated to under_review", "Badge reflects new status"],
+      "scoring": { "time_weight": 0.6, "retry_penalty": 0.1, "max_retries": 2 }
+    },
+    {
+      "id": "task-050",
+      "name": "Resolve a Customs Exception",
+      "category": "customs",
+      "critical": false,
+      "depends_on": ["task-001", "task-008"],
+      "description": "Navigate to the Customs exception queue, filter for open exceptions, and resolve the first open exception using the Resolve button",
+      "steps": [
+        { "order": 1, "action": "navigate", "target": "/demo-org/customs/exceptions", "expected_state": "Exception queue loaded" },
+        { "order": 2, "action": "select", "target": "#exception-status-filter", "value": "open", "expected_state": "Filtered to open exceptions" },
+        { "order": 3, "action": "verify", "assertions": ["At least one open exception visible", "Resolve button present on first row"] },
+        { "order": 4, "action": "click", "target": "button:has-text('Resolve')", "expected_state": "Exception resolved, status changes" },
+        { "order": 5, "action": "wait", "target": "1500", "expected_state": "Resolve request processing" },
+        { "order": 6, "action": "verify", "assertions": ["Exception status badge now shows 'resolved'", "Or exception disappears from open filter view"] }
+      ],
+      "pass_criteria": ["Open exception found", "Resolve action triggered", "Exception status changed to resolved"],
+      "scoring": { "time_weight": 0.8, "retry_penalty": 0.1, "max_retries": 2 }
     }
   ],
   "scoring_model": {
@@ -985,11 +1399,33 @@
       "task-025": 12,
       "task-026": 10,
       "task-027": 8,
-      "task-028": 8
+      "task-028": 8,
+      "task-029": 8,
+      "task-030": 12,
+      "task-031": 20,
+      "task-032": 18,
+      "task-033": 10,
+      "task-034": 6,
+      "task-035": 8,
+      "task-036": 8,
+      "task-037": 8,
+      "task-038": 10,
+      "task-039": 8,
+      "task-040": 6,
+      "task-041": 6,
+      "task-042": 10,
+      "task-043": 10,
+      "task-044": 10,
+      "task-045": 12,
+      "task-046": 10,
+      "task-047": 40,
+      "task-048": 15,
+      "task-049": 10,
+      "task-050": 10
     },
     "pass_threshold": {
-      "min_tasks_passed": 18,
-      "critical_tasks_must_pass": ["task-001", "task-003", "task-005", "task-008", "task-011", "task-017", "task-024"],
+      "min_tasks_passed": 20,
+      "critical_tasks_must_pass": ["task-001", "task-003", "task-005", "task-008", "task-011", "task-017", "task-024", "task-047"],
       "max_retries_per_task": 3,
       "max_human_interventions": 0
     }

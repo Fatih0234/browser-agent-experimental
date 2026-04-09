@@ -1,0 +1,38 @@
+[project]
+name = "browser-gym-test-data"
+version = "0.1.0"
+description = "Test data generation for browser-gym portal training"
+requires-python = ">=3.11"
+dependencies = [
+    "faker>=35.0.0",
+    "supabase>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.pydocstyle]
+convention = "google"

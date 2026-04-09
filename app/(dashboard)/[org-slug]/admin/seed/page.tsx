@@ -145,7 +145,12 @@ export default function AdminSeedPage() {
               <li>5 sample cases (different types and statuses)</li>
               <li>3 documents per case (PDF, CSV, TXT)</li>
               <li>Real file uploads to storage</li>
-              <li>Notifications for tracking</li>
+              <li>6 shipments with invoices</li>
+              <li>8 marketplace listings with orders</li>
+              <li>8 employees with HR submissions</li>
+              <li>5 companies with 8 tenders and 12 submissions</li>
+              <li>6 tax filings and 4 disclosures</li>
+              <li>12 customs declarations with documents and exceptions</li>
             </ul>
             <Button
               onClick={handleSeedClick}
@@ -186,8 +191,60 @@ export default function AdminSeedPage() {
                   <span className="font-medium">{lastResult.documentsCreated}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Notifications</span>
-                  <span className="font-medium">{lastResult.notificationsCreated}</span>
+                  <span className="text-slate-500">Shipments</span>
+                  <span className="font-medium">{lastResult.shipmentsCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Marketplace Listings</span>
+                  <span className="font-medium">{lastResult.listingsCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Orders</span>
+                  <span className="font-medium">{lastResult.ordersCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Employees</span>
+                  <span className="font-medium">{lastResult.employeesCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">HR Submissions</span>
+                  <span className="font-medium">{lastResult.hrSubmissionsCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Companies</span>
+                  <span className="font-medium">{lastResult.companiesCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tenders</span>
+                  <span className="font-medium">{lastResult.tendersCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Submissions</span>
+                  <span className="font-medium">{lastResult.submissionsCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tax Filings</span>
+                  <span className="font-medium">{lastResult.taxFilingsCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Disclosures</span>
+                  <span className="font-medium">{lastResult.disclosuresCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Reconciliation Matches</span>
+                  <span className="font-medium">{lastResult.reconciliationMatchesCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Customs Declarations</span>
+                  <span className="font-medium">{lastResult.customsDeclarationsCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Customs Documents</span>
+                  <span className="font-medium">{lastResult.customsDocumentsCreated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Customs Exceptions</span>
+                  <span className="font-medium">{lastResult.customsExceptionsCreated}</span>
                 </div>
               </div>
             ) : (
@@ -281,7 +338,16 @@ export default function AdminSeedPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Seed Scenario Data?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will create 5 sample cases with 3 documents each (PDF, CSV, TXT).
+              This will create comprehensive sample data including:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>5 cases with documents</li>
+                <li>6 shipments with invoices</li>
+                <li>8 marketplace listings with orders</li>
+                <li>8 employees with HR submissions</li>
+                <li>5 companies with 8 tenders and 12 submissions</li>
+                <li>6 tax filings and 4 disclosures</li>
+                <li>12 customs declarations with documents and exceptions</li>
+              </ul>
               Real files will be uploaded to storage.
             </AlertDialogDescription>
           </AlertDialogHeader>

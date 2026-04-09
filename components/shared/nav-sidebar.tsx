@@ -13,6 +13,10 @@ import {
   Truck,
   ShoppingBag,
   Users,
+  Scale,
+  Building2,
+  GitMerge,
+  Package,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +70,26 @@ export function NavSidebar() {
       label: "HR Portal",
       href: `${basePath}/hr`,
       icon: <Users className="h-4 w-4" />,
+    },
+    {
+      label: "Tender Desk",
+      href: `${basePath}/tenders`,
+      icon: <Scale className="h-4 w-4" />,
+    },
+    {
+      label: "Tax & Disclosure",
+      href: `${basePath}/tax`,
+      icon: <Building2 className="h-4 w-4" />,
+    },
+    {
+      label: "Reconciliation",
+      href: `${basePath}/reconciliation`,
+      icon: <GitMerge className="h-4 w-4" />,
+    },
+    {
+      label: "Customs",
+      href: `${basePath}/customs`,
+      icon: <Package className="h-4 w-4" />,
     },
     {
       label: "Audit Log",
